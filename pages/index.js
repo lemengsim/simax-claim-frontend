@@ -1,7 +1,6 @@
 import Head from 'next/head';
 import { useState, useRef, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import '../styles/globals.css';
 
 // ─── 平台辨識邏輯 ────────────────────────────────────────────────────────────
 /**
