@@ -117,12 +117,12 @@ function ResultDjb({ item, onBack }) {
 
       {/* iOS 一鍵安裝（僅 LPA 格式） */}
       {isLpa && (
-        
+        <a
           href={`${IOS_SETUP_BASE}${encodeURIComponent(qr)}`}
           className="btn-ios"
           style={{ display: 'flex', textDecoration: 'none', marginTop: 16 }}
         >
-          <span style={{ fontSize: 20 }}></span>
+          <span style={{ fontSize: 20 }}>📲</span>
           <span>一鍵立即安裝 eSIM</span>
         </a>
       )}
@@ -211,7 +211,7 @@ function ResultRecovering({ onConfirm }) {
         為保護您的權益，網卡派發功能已暫停。<br />
         如有疑問，歡迎聯繫 SIMAX 客服人員協助。
       </p>
-      
+      <a
         href="mailto:service@simax-esim.com"
         className="btn-submit"
         style={{ display: 'flex', textDecoration: 'none', marginBottom: 12 }}
