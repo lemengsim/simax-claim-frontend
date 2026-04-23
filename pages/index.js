@@ -227,6 +227,7 @@ function ResultRecovering({ onConfirm }) {
 function ResultRefunded({ onConfirm }) {
   return (
     <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
+      {/* 中性資訊圖示 */}
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
         background: 'rgba(99,102,241,0.08)',
@@ -285,9 +286,11 @@ function ResultPending({ item, onBack }) {
 
 // ─── 工具：正規化 API 回應為統一 items 陣列 ───────────────────────────────
 function normalizeResponse(data) {
+  // 多件格式（未來）
   if (Array.isArray(data.items) && data.items.length > 0) {
     return data.items;
   }
+  // 單件格式（目前）
   return [{
     order_id:     data.order_id,
     product_name: data.product_name,
@@ -302,24 +305,29 @@ function getQrType(qr_code_data) {
   if (!qr_code_data) return 'unknown';
   if (qr_code_data.startsWith('WM_ORDER:'))    return 'wm';
   if (qr_code_data.startsWith('DJB_PENDING:')) return 'pending';
-  return 'djb';
+  return 'djb';  // LPA: 或 https:// 都走 DJB 顯示
 }
 
 // ─── 主頁面 ────────────────────────────────────────────────────────────────
 export default function ClaimPage() {
+  // ── 表單狀態 ──
   const [orderNo,  setOrderNo]  = useState('');
   const [email,    setEmail]    = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
 
+  // ── 步驟狀態（1=Login, 2=CardList, 3=Dispatch） ──
   const [step,          setStep]          = useState(1);
-  const [items,         setItems]         = useState([]);
-  const [activeItem,    setActiveItem]    = useState(null);
-  const [claimingId,    setClaimingId]    = useState(null);
+  const [items,         setItems]         = useState([]);      // 正規化後的商品陣列
+  const [activeItem,    setActiveItem]    = useState(null);    // 當前顯示的商品（Step 3）
+  const [claimingId,    setClaimingId]    = useState(null);    // 正在領取的 order_id
+  // 特殊業務狀態（覆蓋步驟流程，直接顯示說明頁）
+  // 'TICKET_REFUNDED' → 票券已退款 / 作廢 / 查無此票
   const [specialStatus, setSpecialStatus] = useState(null);
 
   const canSubmit = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
 
+  // ── Step 1：送出訂單編號 + Email ──────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -334,6 +342,8 @@ export default function ClaimPage() {
 
       const data = await res.json();
 
+      // 特殊業務狀態：票券已退款 / 作廢 / 查無此票
+      // → 不顯示 error 彈窗，平滑切換至說明頁
       if (data.status === 'TICKET_REFUNDED') {
         setSpecialStatus('TICKET_REFUNDED');
         return;
@@ -352,9 +362,11 @@ export default function ClaimPage() {
       setItems(normalized);
 
       if (normalized.length === 1) {
+        // 單件直接跳 Step 3
         setActiveItem(normalized[0]);
         setStep(3);
       } else {
+        // 多件進 Card List
         setStep(2);
       }
     } catch (err) {
@@ -364,19 +376,23 @@ export default function ClaimPage() {
     }
   };
 
+  // ── Step 2：Card List 點擊「領取」───────────────────────────────────────
   const handleClaim = useCallback((item) => {
     setActiveItem(item);
     setStep(3);
+    // 標記該 item 已領取（更新 items 陣列）
     setItems(prev => prev.map(i =>
       i.order_id === item.order_id ? { ...i, dispatched: true } : i
     ));
   }, []);
 
+  // ── 返回 Card List（Step 3 → 2） ─────────────────────────────────────
   const handleBackToList = useCallback(() => {
     setActiveItem(null);
     setStep(2);
   }, []);
 
+  // ── 全部重置（返回 Step 1） ─────────────────────────────────────────
   const handleReset = useCallback(() => {
     setOrderNo('');
     setEmail('');
@@ -388,7 +404,10 @@ export default function ClaimPage() {
     setStep(1);
   }, []);
 
+  // ── 當前 Step 3 顯示類型 ─────────────────────────────────────────────
   const qrType = activeItem ? getQrType(activeItem.qr_code_data) : null;
+
+  // ── 多件時返回按鈕設定 ────────────────────────────────────────────────
   const backHandler = items.length > 1 ? handleBackToList : null;
 
   return (
@@ -406,9 +425,10 @@ export default function ClaimPage() {
           {/* ── Logo ── */}
           <div className="logo-wrap">
             <div className="logo-title">SIMAX eSIM 領取中心</div>
-            <div className="logo-sub">輸入票券序號，即時取得您的 eSIM</div>
+            <div className="logo-sub">輸入訂單編號，即刻領取您的 eSIM</div>
           </div>
 
+          {/* ════════════════ 特殊狀態：票券退款 / 作廢 / 查無此票 ═══════════ */}
           {specialStatus === 'TICKET_REFUNDED' && (
             <ResultRefunded onConfirm={handleReset} />
           )}
@@ -416,8 +436,10 @@ export default function ClaimPage() {
             <ResultRecovering onConfirm={handleReset} />
           )}
 
+          {/* ── 步驟進度條 + 步驟內容（特殊狀態時整體隱藏） ── */}
           {!specialStatus && <StepBar step={step} />}
 
+          {/* ════════════════ STEP 1：Login ════════════════ */}
           {!specialStatus && step === 1 && (
             <form className="form" onSubmit={handleLogin} autoComplete="off">
 
@@ -432,7 +454,6 @@ export default function ClaimPage() {
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <span className="hint">💡 MOMO 購物 → 訂單查詢 → 找到對應訂單 → 複製訂單編號</span>
               </div>
 
               <div className="field">
@@ -464,6 +485,7 @@ export default function ClaimPage() {
             </form>
           )}
 
+          {/* ════════════════ STEP 2：Card List ════════════════ */}
           {!specialStatus && step === 2 && (
             <div>
               <div className="list-header">
@@ -494,6 +516,7 @@ export default function ClaimPage() {
             </div>
           )}
 
+          {/* ════════════════ STEP 3：Dispatch ════════════════ */}
           {!specialStatus && step === 3 && activeItem && (
             <>
               {qrType === 'djb' && (
@@ -520,6 +543,7 @@ export default function ClaimPage() {
 
         </div>
 
+        {/* ── Footer ── */}
         <div className="footer">
           SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫客服<br />
           <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
