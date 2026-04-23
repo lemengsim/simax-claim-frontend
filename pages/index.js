@@ -359,7 +359,7 @@ export default function ClaimPage() {
 
   // ── 全部重置（返回 Step 1） ─────────────────────────────────────────
   const handleReset = useCallback(() => {
-    setPin('');
+    setOrderNo('');
     setEmail('');
     setError('');
     setItems([]);

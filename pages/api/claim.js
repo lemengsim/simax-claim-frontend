@@ -106,13 +106,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── 5b. 成功：回傳 QR Code / WM 訂單資訊 ────────────────────────────────
+  // ── 5b. 成功：回傳 items 陣列（含 QR Code）────────────────────────────────
+  // GCP 後端統一回傳 items[]，前台 normalizeResponse 已相容多件 / 單件格式
   return res.status(200).json({
-    success:      true,
-    order_id:     data.order_id,
-    product_name: data.product_name,
-    vendor:       data.vendor,
-    qr_code_data: data.qr_code_data,
+    success:  true,
+    items:    data.items   || null,
+    // 保留單件欄位供向下相容（若 GCP 舊版仍回傳單件格式）
+    order_id:     data.order_id     || (data.items && data.items[0] && data.items[0].order_id)     || null,
+    product_name: data.product_name || (data.items && data.items[0] && data.items[0].product_name) || null,
+    vendor:       data.vendor       || (data.items && data.items[0] && data.items[0].vendor)       || null,
+    qr_code_data: data.qr_code_data || null,
     message:      data.message || null,
   });
 }
