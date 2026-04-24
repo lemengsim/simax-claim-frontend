@@ -122,7 +122,7 @@ function ResultDjb({ item, onBack }) {
           className="btn-ios"
           style={{ display: 'flex', textDecoration: 'none', marginTop: 16 }}
         >
-          <span style={{ fontSize: 20 }}>📲</span>
+          <span style={{ fontSize: 20 }}></span>
           <span>一鍵立即安裝 eSIM</span>
         </a>
       )}
@@ -198,27 +198,24 @@ function ResultRecovering({ onConfirm }) {
     <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
-        background: 'rgba(234,179,8,0.10)',
+        background: 'rgba(59,130,246,0.08)',   // 柔和藍底
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         margin: '0 auto 16px',
-        fontSize: 32,
-      }}>⚠️</div>
+        fontSize: 34,
+        color: '#3b82f6',                       // 藍色資訊圖示
+        lineHeight: 1,
+      }}>ⓘ</div>
       <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
-        兌換功能暫停使用
+        訂單狀態確認中
       </div>
       <p style={{ color: 'var(--muted)', fontSize: 14, lineHeight: 1.8, margin: '0 0 28px' }}>
-        系統偵測到此訂單目前已進入退換貨或回收流程。<br />
-        為保護您的權益，網卡派發功能已暫停。<br />
-        如有疑問，歡迎聯繫 SIMAX 客服人員協助。
+        由於您的訂單目前正在處理退換貨流程，<br />
+        領取功能已暫時關閉。<br />
+        這是為了確保您的權益不受影響，請您諒解。
       </p>
-      <a
-        href="mailto:service@simax-esim.com"
-        className="btn-submit"
-        style={{ display: 'flex', textDecoration: 'none', marginBottom: 12 }}
-      >
-        聯繫客服
-      </a>
-      <button className="btn-secondary" onClick={onConfirm}>返回</button>
+      <button className="btn-submit" onClick={onConfirm}>
+        好的，我了解了
+      </button>
     </div>
   );
 }
@@ -361,14 +358,8 @@ export default function ClaimPage() {
       const normalized = normalizeResponse(data);
       setItems(normalized);
 
-      if (normalized.length === 1) {
-        // 單件直接跳 Step 3
-        setActiveItem(normalized[0]);
-        setStep(3);
-      } else {
-        // 多件進 Card List
-        setStep(2);
-      }
+      // 不論單件/多件都進 Step 2 讓客人確認商品再按「領取」
+      setStep(2);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -447,7 +438,7 @@ export default function ClaimPage() {
                 <label>MOMO 訂單編號</label>
                 <input
                   type="text"
-                  placeholder="例：26042217105803-001-001-001"
+                  placeholder="例：26042217105803"
                   value={orderNo}
                   onChange={(e) => { setOrderNo(e.target.value.trim()); setError(''); }}
                   autoFocus
@@ -544,9 +535,46 @@ export default function ClaimPage() {
         </div>
 
         {/* ── Footer ── */}
-        <div className="footer">
-          SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫客服<br />
-          <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
+        <div className="footer" style={{ textAlign: 'center' }}>
+          <div style={{ marginBottom: 12, color: 'var(--muted)', fontSize: 12 }}>
+            SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫
+          </div>
+          <a
+            href="https://line.me/R/ti/p/@357wafqg?ts=01291734&oat_content=url"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 18px',
+              borderRadius: 9999,
+              border: '1px solid rgba(0,0,0,0.08)',
+              background: '#fff',
+              color: '#4b5563',          // text-gray-600
+              fontSize: 13,
+              fontWeight: 500,
+              textDecoration: 'none',
+              transition: 'background 0.15s, box-shadow 0.15s',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f3f4f6';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.06)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#fff';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#06C755" aria-hidden="true">
+              <path d="M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314M9.614 13.19H7.205c-.346 0-.627-.285-.627-.63V8.108c0-.346.281-.63.627-.63.349 0 .63.284.63.63v4.141h1.779c.349 0 .627.283.627.629 0 .344-.278.629-.627.629m1.784-.63c0 .344-.282.629-.63.629-.346 0-.627-.285-.627-.629V8.108c0-.345.281-.63.627-.63.348 0 .63.285.63.63v4.772zm5.928 0c0 .27-.175.51-.43.596-.066.021-.135.031-.2.031-.205 0-.398-.09-.519-.254l-2.464-3.353v2.98c0 .344-.278.629-.627.629-.346 0-.63-.285-.63-.629V8.108c0-.27.174-.51.428-.597.064-.022.137-.03.199-.03.194 0 .384.089.503.253l2.484 3.355v-2.98c0-.346.276-.63.628-.63.346 0 .63.284.63.63v4.452zm3.637-2.506h-1.757v1.126h1.757c.344 0 .626.282.626.629 0 .346-.282.628-.626.628h-2.389c-.344 0-.629-.282-.629-.628v-4.77c0-.345.285-.63.629-.63h2.389c.344 0 .626.285.626.63 0 .346-.282.629-.626.629h-1.757v1.124h1.757c.344 0 .626.285.626.629 0 .346-.279.626-.626.629"/>
+            </svg>
+            聯繫 LINE 客服
+          </a>
+          <div style={{ marginTop: 14, fontSize: 11, color: '#9ca3af' }}>
+            © {new Date().getFullYear()} SIMAX. All rights reserved.
+          </div>
         </div>
       </div>
     </>
