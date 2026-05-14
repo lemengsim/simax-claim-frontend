@@ -302,7 +302,8 @@ export default function ClaimPage() {
   const [specialStatus, setSpecialStatus] = useState(null);
 
   const canSubmitOrder = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
-  const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !loading;
+  const hasDuplicatePin = ticketPins.length > 1 && new Set(ticketPins.map(p => p.trim().toUpperCase()).filter(p => p)).size < ticketPins.filter(p => p.trim()).length;
+  const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !hasDuplicatePin && !loading;
 
   // ── mount：從 localStorage 還原 email ────────────────────────────────
   useEffect(() => {
@@ -530,6 +531,9 @@ export default function ClaimPage() {
                   />
                   {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
                     <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
+                  )}
+                  {pin.length > 0 && CUSTOMER_PIN_REGEX.test(pin.trim()) && ticketPins.some((p, i) => i !== idx && p.trim().toUpperCase() === pin.trim().toUpperCase()) && (
+                    <span className="hint" style={{ color: '#ef4444' }}>⚠️ 票券序號不能重複</span>
                   )}
                 </div>
               ))}
