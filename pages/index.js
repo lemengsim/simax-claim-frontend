@@ -165,6 +165,15 @@ function ResultDjb({ item, onBack }) {
         <div className="result-order-id">訂單編號：{item.order_id}</div>
       )}
 
+      {/* 截圖提醒 */}
+      <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginTop: 16, textAlign: 'left' }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 4 }}>【小提醒】</div>
+        <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.7 }}>
+          若您稍後才要安裝，建議先將此 QR Code 截圖保存。<br />
+          日後需要使用時，直接掃描圖片即可輕鬆安裝。
+        </div>
+      </div>
+
       {onBack && (
         <button
           className="btn-submit"
