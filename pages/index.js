@@ -468,7 +468,7 @@ export default function ClaimPage() {
   const handleReset = useCallback(() => {
     setOrderNo('');
     setEmail('');
-    try { localStorage.removeItem(LS_EMAIL_KEY); localStorage.removeItem(LS_CLAIM_KEY); } catch {}
+    try { localStorage.removeItem(LS_EMAIL_KEY); } catch {}
     setError('');
     setItems([]);
     setActiveItem(null);
@@ -610,7 +610,7 @@ export default function ClaimPage() {
                 type="button"
                 className="btn-secondary"
                 style={{ marginTop: 8 }}
-                onClick={() => { setPhase('order'); setError(''); setTicketPins(Array(verifiedQty).fill('')); setOrderNo(''); setEmail(''); try { localStorage.removeItem(LS_EMAIL_KEY); } catch {} }}
+                onClick={() => { setPhase('order'); setError(''); setTicketPins(Array(verifiedQty).fill('')); setOrderNo(''); setEmail(''); try { localStorage.removeItem(LS_EMAIL_KEY); } catch {}; }}
               >
                 ← 回上一頁
               </button>
