@@ -228,8 +228,35 @@ input:focus {
 .btn-primary:active:not(:disabled) { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.42; cursor: not-allowed; }
 
-/* alias */
-.btn-submit { composes: btn-primary; }
+/* alias — 與 btn-primary 完全相同（globals.css 不支援 composes，需複製完整樣式） */
+.btn-submit {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 18px rgba(53,181,218,0.28);
+  letter-spacing: -0.2px;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: var(--brand-dark);
+  box-shadow: 0 6px 26px rgba(53,181,218,0.38);
+  transform: translateY(-1px);
+}
+
+.btn-submit:active:not(:disabled) { transform: translateY(0); }
+.btn-submit:disabled { opacity: 0.42; cursor: not-allowed; }
 
 .btn-secondary {
   width: 100%;

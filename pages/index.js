@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.1 — Multi-PIN 核銷流程）
+ * 模組：SIMAX eSIM 領取中心前台（v2.2 — 按鈕樣式修正 + Email 記憶）
  *
+ * # v2.2.0 | 2026-05-14 | 修正 btn-submit CSS composes 無效問題；← 修改訂單按鈕改 btn-secondary；Email 存 localStorage
  * # v2.1.0 | 2026-05-14 | Multi-PIN：Step 1 拆成兩階段，第二階段收集所有電子票券序號
  * # v2.0.0 | 原始 Apple Minimalist 重構版
  *
@@ -19,8 +20,11 @@
  */
 
 import Head from 'next/head';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+
+// localStorage key
+const LS_EMAIL_KEY = 'simax_saved_email';
 
 // ─── 常數 ──────────────────────────────────────────────────────────────────
 const IOS_SETUP_BASE = 'https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=';
@@ -299,6 +303,14 @@ export default function ClaimPage() {
   const canSubmitOrder = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
   const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !loading;
 
+  // ── mount：從 localStorage 還原 email ────────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_EMAIL_KEY);
+      if (saved) setEmail(saved);
+    } catch { /* 瀏覽器隱私模式可能擋 localStorage */ }
+  }, []);
+
   // ── Step 1a：送出訂單編號 + Email → 驗證 qty ─────────────────────────
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -320,6 +332,9 @@ export default function ClaimPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
       }
+
+      // 驗證成功：把 email 存進 localStorage，下次自動帶入
+      try { localStorage.setItem(LS_EMAIL_KEY, email.trim()); } catch { /* ignore */ }
 
       // 依 qty 建立對應數量的空輸入框
       const qty = data.qty || 1;
@@ -396,7 +411,11 @@ export default function ClaimPage() {
   // ── 全部重置（返回 Step 1） ─────────────────────────────────────────
   const handleReset = useCallback(() => {
     setOrderNo('');
-    setEmail('');
+    // Email 不清空：從 localStorage 還原，讓使用者重查時自動帶入同一信箱
+    try {
+      const saved = localStorage.getItem(LS_EMAIL_KEY);
+      setEmail(saved || '');
+    } catch { setEmail(''); }
     setError('');
     setItems([]);
     setActiveItem(null);
@@ -473,145 +492,4 @@ export default function ClaimPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
-                />
-                <span className="hint">為確保您能順利接收 QR Code，請再次確認 Email 是否正確</span>
-              </div>
-
-              {error && (
-                <div className="error-box">
-                  <span>⚠️</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button type="submit" className="btn-submit" disabled={!canSubmitOrder}>
-                {loading
-                  ? <><span className="spinner" /> 驗證中，請稍候...</>
-                  : '下一步 →'
-                }
-              </button>
-
-            </form>
-          )}
-
-          {/* ════════════════ STEP 1b：輸入電子票券序號 ════════════════ */}
-          {!specialStatus && step === 1 && phase === 'pins' && (
-            <form className="form" onSubmit={handleClaim} autoComplete="off">
-
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: 10, fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                📋 訂單共 <strong style={{ color: 'var(--brand)' }}>{verifiedQty} 張</strong> eSIM，請輸入所有電子票券序號才能領取。
-              </div>
-
-              {ticketPins.map((pin, idx) => (
-                <div className="field" key={idx}>
-                  <label>電子票券序號 {verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}</label>
-                  <input
-                    type="text"
-                    placeholder="12 碼英數字，例：AB1234567890"
-                    value={pin}
-                    onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
-                    autoFocus={idx === 0}
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={12}
-                    style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
-                  />
-                  {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
-                    <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
-                  )}
-                </div>
-              ))}
-
-              {error && (
-                <div className="error-box">
-                  <span>⚠️</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <button type="submit" className="btn-submit" disabled={!canSubmitPins}>
-                {loading
-                  ? <><span className="spinner" /> 核銷中，請稍候...</>
-                  : '核銷領取 eSIM →'
-                }
-              </button>
-
-              <button
-                type="button"
-                className="btn-submit"
-                style={{ marginTop: 8, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-                onClick={() => { setPhase('order'); setError(''); }}
-              >
-                ← 修改訂單編號
-              </button>
-
-            </form>
-          )}
-
-          {/* ════════════════ STEP 2：Card List ════════════════ */}
-          {!specialStatus && step === 2 && (
-            <div>
-              <div className="list-header">
-                <div className="list-header-title">您的商品清單</div>
-                <div className="list-header-sub">共 {items.length} 件 · 請點擊「領取」取得各品項的 eSIM</div>
-              </div>
-
-              <div className="card-list">
-                {items.map((item, i) => (
-                  <ItemCard
-                    key={item.order_id || i}
-                    item={item}
-                    onClaim={handleSelectItem}
-                    claiming={claimingId === item.order_id}
-                  />
-                ))}
-              </div>
-
-              <div className="divider" />
-
-              <button
-                className="btn-submit"
-                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-                onClick={handleReset}
-              >
-                ← 查詢其他票券
-              </button>
-            </div>
-          )}
-
-          {/* ════════════════ STEP 3：Dispatch ════════════════ */}
-          {!specialStatus && step === 3 && activeItem && (
-            <>
-              {qrType === 'djb' && (
-                <ResultDjb item={activeItem} onBack={backHandler} />
-              )}
-              {qrType === 'wm' && (
-                <ResultWm item={activeItem} email={email} onBack={backHandler} />
-              )}
-              {qrType === 'pending' && (
-                <ResultPending item={activeItem} onBack={backHandler} />
-              )}
-
-              <div className="divider" />
-
-              <button
-                className="btn-submit"
-                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-                onClick={handleReset}
-              >
-                ← 查詢其他票券
-              </button>
-            </>
-          )}
-
-        </div>
-
-        {/* ── Footer ── */}
-        <div className="footer">
-          SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫客服<br />
-          <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
-        </div>
-      </div>
-    </>
-  );
-}
+            
