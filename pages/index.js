@@ -471,17 +471,15 @@ export default function ClaimPage() {
             <form className="form" onSubmit={handleVerify} autoComplete="off">
 
               <div className="field">
-                <label>MOMO 訂單編號</label>
                 <input
                   type="text"
-                  placeholder="例：26042217105803-001-001-001"
+                  placeholder="MOMO 訂單編號，例：26042217105803-001-001-001"
                   value={orderNo}
                   onChange={(e) => { setOrderNo(e.target.value.trim()); setError(''); }}
                   autoFocus
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <span className="hint">💡 MOMO 購物 → 訂單查詢 → 找到對應訂單 → 複製訂單編號</span>
               </div>
 
               <div className="field">
@@ -492,4 +490,145 @@ export default function ClaimPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
-            
+                />
+                <span className="hint">為確保您能順利接收 QR Code，請再次確認 Email 是否正確</span>
+              </div>
+
+              {error && (
+                <div className="error-box">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button type="submit" className="btn-submit" disabled={!canSubmitOrder}>
+                {loading
+                  ? <><span className="spinner" /> 驗證中，請稍候...</>
+                  : '下一步 →'
+                }
+              </button>
+
+            </form>
+          )}
+
+          {/* ════════════════ STEP 1b：輸入電子票券序號 ════════════════ */}
+          {!specialStatus && step === 1 && phase === 'pins' && (
+            <form className="form" onSubmit={handleClaim} autoComplete="off">
+
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: 10, fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+                📋 訂單共 <strong style={{ color: 'var(--brand)' }}>{verifiedQty} 張</strong> eSIM，請輸入所有電子票券序號才能領取。
+              </div>
+
+              {ticketPins.map((pin, idx) => (
+                <div className="field" key={idx}>
+                  <label>電子票券序號 {verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}</label>
+                  <input
+                    type="text"
+                    placeholder="12 碼英數字，例：AB1234567890"
+                    value={pin}
+                    onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
+                    autoFocus={idx === 0}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={12}
+                    style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                  />
+                  {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
+                    <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
+                  )}
+                </div>
+              ))}
+
+              {error && (
+                <div className="error-box">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button type="submit" className="btn-submit" disabled={!canSubmitPins}>
+                {loading
+                  ? <><span className="spinner" /> 核銷中，請稍候...</>
+                  : '核銷領取 eSIM →'
+                }
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ marginTop: 8 }}
+                onClick={() => { setPhase('order'); setError(''); }}
+              >
+                ← 修改訂單編號
+              </button>
+
+            </form>
+          )}
+
+          {/* ════════════════ STEP 2：Card List ════════════════ */}
+          {!specialStatus && step === 2 && (
+            <div>
+              <div className="list-header">
+                <div className="list-header-title">您的商品清單</div>
+                <div className="list-header-sub">共 {items.length} 件 · 請點擊「領取」取得各品項的 eSIM</div>
+              </div>
+
+              <div className="card-list">
+                {items.map((item, i) => (
+                  <ItemCard
+                    key={item.order_id || i}
+                    item={item}
+                    onClaim={handleSelectItem}
+                    claiming={claimingId === item.order_id}
+                  />
+                ))}
+              </div>
+
+              <div className="divider" />
+
+              <button
+                className="btn-submit"
+                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                onClick={handleReset}
+              >
+                ← 查詢其他票券
+              </button>
+            </div>
+          )}
+
+          {/* ════════════════ STEP 3：Dispatch ════════════════ */}
+          {!specialStatus && step === 3 && activeItem && (
+            <>
+              {qrType === 'djb' && (
+                <ResultDjb item={activeItem} onBack={backHandler} />
+              )}
+              {qrType === 'wm' && (
+                <ResultWm item={activeItem} email={email} onBack={backHandler} />
+              )}
+              {qrType === 'pending' && (
+                <ResultPending item={activeItem} onBack={backHandler} />
+              )}
+
+              <div className="divider" />
+
+              <button
+                className="btn-submit"
+                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                onClick={handleReset}
+              >
+                ← 查詢其他票券
+              </button>
+            </>
+          )}
+
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="footer">
+          SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫客服<br />
+          <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
+        </div>
+      </div>
+    </>
+  );
+}
