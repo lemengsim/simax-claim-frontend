@@ -305,13 +305,6 @@ export default function ClaimPage() {
   const hasDuplicatePin = ticketPins.length > 1 && new Set(ticketPins.map(p => p.trim().toUpperCase()).filter(p => p)).size < ticketPins.filter(p => p.trim()).length;
   const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !hasDuplicatePin && !loading;
 
-  // ── mount：從 localStorage 還原 email ────────────────────────────────
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LS_EMAIL_KEY);
-      if (saved) setEmail(saved);
-    } catch { /* 瀏覽器隱私模式可能擋 localStorage */ }
-  }, []);
 
   // ── Step 1a：送出訂單編號 + Email → 驗證 qty ─────────────────────────
   const handleVerify = async (e) => {
@@ -334,9 +327,6 @@ export default function ClaimPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
       }
-
-      // 驗證成功：把 email 存進 localStorage，下次自動帶入
-      try { localStorage.setItem(LS_EMAIL_KEY, email.trim()); } catch { /* ignore */ }
 
       // 依 qty 建立對應數量的空輸入框
       const qty = data.qty || 1;
