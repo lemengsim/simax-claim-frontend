@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.3 — PIN 輸入框標籤內嵌 + 回上一頁）
+ * 模組：SIMAX eSIM 領取中心前台（v2.4 — PIN 輸入框移除 placeholder 範例文字）
  *
+ * # v2.4.0 | 2026-05-15 | PIN 輸入框移除「例：AB1234567890」placeholder
  * # v2.3.0 | 2026-05-15 | PIN 輸入框 label 移至框內並加「共12碼」；「修改訂單編號」改為「回上一頁」
  * # v2.2.0 | 2026-05-14 | 修正 btn-submit CSS composes 無效問題；← 修改訂單按鈕改 btn-secondary；Email 存 localStorage
  * # v2.1.0 | 2026-05-14 | Multi-PIN：Step 1 拆成兩階段，第二階段收集所有電子票券序號
@@ -526,7 +527,7 @@ export default function ClaimPage() {
                     </span>
                     <input
                       type="text"
-                      placeholder="例：AB1234567890"
+                      placeholder=""
                       value={pin}
                       onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
                       autoFocus={idx === 0}
