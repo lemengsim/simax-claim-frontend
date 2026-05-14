@@ -342,11 +342,12 @@ export default function ClaimPage() {
       const saved = localStorage.getItem(LS_CLAIM_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setItems(parsed);
-          if (parsed.length === 1) {
-            // 單張直接還原到 QR 頁面
-            setActiveItem(parsed[0]);
+        // 支援新格式 { orderNo, items } 與舊格式（純陣列）
+        const itemList = Array.isArray(parsed) ? parsed : parsed?.items;
+        if (itemList && itemList.length > 0) {
+          setItems(itemList);
+          if (itemList.length === 1) {
+            setActiveItem(itemList[0]);
             setStep(3);
           } else {
             setStep(2);
@@ -377,6 +378,18 @@ export default function ClaimPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
       }
+
+      // 若此訂單已領取過（localStorage 有記錄），直接跳過 PIN 顯示結果
+      try {
+        const cached = JSON.parse(localStorage.getItem(LS_CLAIM_KEY) || 'null');
+        const cachedItems = cached?.items || (Array.isArray(cached) ? cached : null);
+        if (cachedItems && cached?.orderNo === orderNo.trim() && cachedItems.length > 0) {
+          setItems(cachedItems);
+          if (cachedItems.length === 1) { setActiveItem(cachedItems[0]); setStep(3); }
+          else { setStep(2); }
+          return;
+        }
+      } catch { /* ignore */ }
 
       // 依 qty 建立對應數量的空輸入框
       const qty = data.qty || 1;
@@ -421,7 +434,7 @@ export default function ClaimPage() {
 
       const normalized = normalizeResponse(data);
       setItems(normalized);
-      try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify(normalized)); } catch { /* ignore */ }
+      try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify({ orderNo: orderNo.trim(), items: normalized })); } catch { /* ignore */ }
 
       if (normalized.length === 1) {
         setActiveItem(normalized[0]);
