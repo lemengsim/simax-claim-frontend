@@ -198,7 +198,7 @@ app.post('/api/internal/redeem', async (req, res) => {
     .eq('order_id', momoOrderNo)
     .maybeSingle();
 
-  if (existing) {
+  if (existing && existing.qr_code_data) {
     console.log(`[express] 此訂單已處理過：${existing.order_id} status=${existing.status}`);
 
     // 解析已儲存的 QR codes（支援單件字串 或 多件 JSON 陣列字串）
