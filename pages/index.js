@@ -1,7 +1,9 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.9 — Step 3 排版統一）
+ * 模組：SIMAX eSIM 領取中心前台（v2.11 — 移除 Step 3 成功 emoji）
  *
+ * # v2.11.0 | 2026-05-15 | 移除 Step 3「eSIM 領取成功！」上方 🎉 emoji
+ * # v2.10.0 | 2026-05-15 | Step 2 標題文案改為「共N件eSIM · 可提早領取」；按鈕加大上方間距
  * # v2.9.0 | 2026-05-15 | 統一 Step 3 info block 字體/間距/對齊
  * # v2.8.0 | 2026-05-15 | 移除 header icon / 副標題；簡化 DJB 安裝說明文案
  * # v2.7.0 | 2026-05-15 | 整理 Step 3 info block：啟用碼+複製、訂單編號、ICCID
@@ -109,7 +111,6 @@ function ResultDjb({ item, onBack }) {
 
   return (
     <div className="result-card">
-      <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
       <div className="result-title">eSIM 領取成功！</div>
 
       {/* 商品資訊 */}
@@ -634,8 +635,7 @@ export default function ClaimPage() {
           {!specialStatus && step === 2 && (
             <div>
               <div className="list-header">
-                <div className="list-header-title">您的商品清單</div>
-                <div className="list-header-sub">共 {items.length} 件 · 請點擊「領取」取得各品項的 eSIM</div>
+                <div style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center' }}>共 {items.length} 件 eSIM · 可提早領取</div>
               </div>
 
               <div className="card-list">
@@ -649,15 +649,15 @@ export default function ClaimPage() {
                 ))}
               </div>
 
-              <div className="divider" />
-
-              <button
-                className="btn-submit"
-                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-                onClick={handleReset}
-              >
-                重新兌換
-              </button>
+              <div style={{ marginTop: 24 }}>
+                <button
+                  className="btn-submit"
+                  style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                  onClick={handleReset}
+                >
+                  重新兌換
+                </button>
+              </div>
             </div>
           )}
 
