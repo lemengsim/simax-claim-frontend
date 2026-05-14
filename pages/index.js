@@ -473,7 +473,7 @@ export default function ClaimPage() {
               <div className="field">
                 <input
                   type="text"
-                  placeholder="MOMO 訂單編號，例：26042217105803-001-001-001"
+                  placeholder="MOMO 訂單編號"
                   value={orderNo}
                   onChange={(e) => { setOrderNo(e.target.value.trim()); setError(''); }}
                   autoFocus
@@ -483,15 +483,13 @@ export default function ClaimPage() {
               </div>
 
               <div className="field">
-                <label>信箱</label>
                 <input
                   type="email"
-                  placeholder="例：user@example.com"
+                  placeholder="信箱"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                 />
-                <span className="hint">為確保您能順利接收 QR Code，請再次確認 Email 是否正確</span>
               </div>
 
               {error && (
