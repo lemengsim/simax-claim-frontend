@@ -344,7 +344,13 @@ export default function ClaimPage() {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
           setItems(parsed);
-          setStep(2);
+          if (parsed.length === 1) {
+            // 單張直接還原到 QR 頁面
+            setActiveItem(parsed[0]);
+            setStep(3);
+          } else {
+            setStep(2);
+          }
         }
       }
     } catch { /* ignore */ }
