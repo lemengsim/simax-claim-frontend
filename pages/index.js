@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.7 — 整理 Step 3 資訊列，顯示啟用碼/訂單編號/ICCID）
+ * 模組：SIMAX eSIM 領取中心前台（v2.8 — 精簡 header 文案與 icon）
  *
+ * # v2.8.0 | 2026-05-15 | 移除 header icon / 副標題；簡化 DJB 安裝說明文案
  * # v2.7.0 | 2026-05-15 | 整理 Step 3 info block：啟用碼+複製、訂單編號、ICCID
  * # v2.4.0 | 2026-05-15 | PIN 輸入框移除「例：AB1234567890」placeholder
  * # v2.3.0 | 2026-05-15 | PIN 輸入框 label 移至框內並加「共12碼」；「修改訂單編號」改為「回上一頁」
@@ -120,7 +121,7 @@ function ResultDjb({ item, onBack }) {
 
       <div className="result-sub" style={{ marginTop: 8 }}>
         {isLpa
-          ? '點擊下方按鈕，或掃描 QR Code 在 iPhone 上安裝 eSIM'
+          ? '點擊下方按鈕，或掃描 QR Code 安裝 eSIM'
           : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
       </div>
 
@@ -522,9 +523,7 @@ export default function ClaimPage() {
 
           {/* ── Logo ── */}
           <div className="logo-wrap">
-            <div className="logo-icon">📡</div>
             <div className="logo-title">SIMAX eSIM 領取中心</div>
-            <div className="logo-sub">輸入票券序號，即時取得您的 eSIM</div>
           </div>
 
           {/* ════════════════ 特殊狀態：票券退款 / 作廢 / 查無此票 ═══════════ */}
