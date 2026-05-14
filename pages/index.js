@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.4 — PIN 輸入框移除 placeholder 範例文字）
+ * 模組：SIMAX eSIM 領取中心前台（v2.7 — 整理 Step 3 資訊列，顯示啟用碼/訂單編號/ICCID）
  *
+ * # v2.7.0 | 2026-05-15 | 整理 Step 3 info block：啟用碼+複製、訂單編號、ICCID
  * # v2.4.0 | 2026-05-15 | PIN 輸入框移除「例：AB1234567890」placeholder
  * # v2.3.0 | 2026-05-15 | PIN 輸入框 label 移至框內並加「共12碼」；「修改訂單編號」改為「回上一頁」
  * # v2.2.0 | 2026-05-14 | 修正 btn-submit CSS composes 無效問題；← 修改訂單按鈕改 btn-secondary；Email 存 localStorage
@@ -150,20 +151,35 @@ function ResultDjb({ item, onBack }) {
         </div>
       )}
 
-      {/* 啟用碼原文 + 複製 */}
-      <div className="qr-raw-box">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>啟用碼</span>
-          <button className="btn-copy" onClick={handleCopy}>{copied ? '已複製 ✓' : '複製'}</button>
+      {/* 資訊列：啟用碼 / 訂單編號 / ICCID */}
+      <div style={{ width: '100%', marginTop: 16, borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        {/* 啟用碼 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>啟用碼</div>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>{qr}</div>
+          </div>
+          <button className="btn-copy" onClick={handleCopy} style={{ marginLeft: 10, flexShrink: 0 }}>{copied ? '✓' : '複製'}</button>
         </div>
-        <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>
-          {qr}
-        </div>
+        {/* 訂單編號 */}
+        {item.order_id && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none' }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>訂單編號</div>
+              <div style={{ fontSize: 13, color: 'var(--text)' }}>{item.order_id}</div>
+            </div>
+          </div>
+        )}
+        {/* ICCID */}
+        {item.iccid && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>ICCID</div>
+              <div style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--text)' }}>{item.iccid}</div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {item.order_id && (
-        <div className="result-order-id">訂單編號：{item.order_id}</div>
-      )}
 
       {/* 截圖提醒 */}
       <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginTop: 16, textAlign: 'left' }}>
