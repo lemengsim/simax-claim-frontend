@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.2 — 按鈕樣式修正 + Email 記憶）
+ * 模組：SIMAX eSIM 領取中心前台（v2.3 — PIN 輸入框標籤內嵌 + 回上一頁）
  *
+ * # v2.3.0 | 2026-05-15 | PIN 輸入框 label 移至框內並加「共12碼」；「修改訂單編號」改為「回上一頁」
  * # v2.2.0 | 2026-05-14 | 修正 btn-submit CSS composes 無效問題；← 修改訂單按鈕改 btn-secondary；Email 存 localStorage
  * # v2.1.0 | 2026-05-14 | Multi-PIN：Step 1 拆成兩階段，第二階段收集所有電子票券序號
  * # v2.0.0 | 原始 Apple Minimalist 重構版
@@ -519,18 +520,21 @@ export default function ClaimPage() {
 
               {ticketPins.map((pin, idx) => (
                 <div className="field" key={idx}>
-                  <label>電子票券序號 {verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}</label>
-                  <input
-                    type="text"
-                    placeholder="12 碼英數字，例：AB1234567890"
-                    value={pin}
-                    onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
-                    autoFocus={idx === 0}
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={12}
-                    style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
-                  />
+                  <div className="pin-input-wrap">
+                    <span className="pin-input-label">
+                      電子票券序號{verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}　共12碼
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="例：AB1234567890"
+                      value={pin}
+                      onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
+                      autoFocus={idx === 0}
+                      autoComplete="off"
+                      spellCheck={false}
+                      maxLength={12}
+                    />
+                  </div>
                   {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
                     <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
                   )}
@@ -557,7 +561,7 @@ export default function ClaimPage() {
                 style={{ marginTop: 8 }}
                 onClick={() => { setPhase('order'); setError(''); }}
               >
-                ← 修改訂單編號
+                ← 回上一頁
               </button>
 
             </form>

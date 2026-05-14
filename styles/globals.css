@@ -610,6 +610,45 @@ input:focus {
   line-height: 1.8;
 }
 
+/* ── Pin input with inner label ───────────────────────────────────────────── */
+.pin-input-wrap {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 10px 16px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+
+.pin-input-wrap:focus-within {
+  border-color: var(--brand);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(53,181,218,0.12);
+}
+
+.pin-input-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.pin-input-wrap input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-size: 15px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  letter-spacing: 0.05em;
+  width: 100%;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 520px) {
   .card { padding: 32px 22px; }
