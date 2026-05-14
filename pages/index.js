@@ -68,7 +68,6 @@ function ItemCard({ item, onClaim, claiming }) {
       <div className="item-card-info">
         <div className="item-card-name">{item.product_name || '未知商品'}</div>
         <div className="item-card-meta">
-          <span className="vendor-badge">{item.vendor || 'DJB'}</span>
           {item.order_id && <span style={{ color: 'var(--muted)', fontSize: 11 }}>#{item.order_id}</span>}
         </div>
       </div>
