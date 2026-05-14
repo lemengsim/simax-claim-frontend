@@ -560,7 +560,7 @@ export default function ClaimPage() {
                 type="button"
                 className="btn-secondary"
                 style={{ marginTop: 8 }}
-                onClick={() => { setPhase('order'); setError(''); }}
+                onClick={() => { setPhase('order'); setError(''); setTicketPins(Array(verifiedQty).fill('')); }}
               >
                 ← 回上一頁
               </button>
