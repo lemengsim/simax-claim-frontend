@@ -1,18 +1,15 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.0 — Apple Minimalist 重構）
+ * 模組：SIMAX eSIM 領取中心前台（v2.1 — Multi-PIN 核銷流程）
  *
- * 【UX 三步流程】
- *  Step 1 — Login     : PIN 碼 + Email 同時顯示，送出後呼叫 /api/claim
- *  Step 2 — Card List : 若回傳多件商品，顯示卡片列表，每張卡片有獨立「領取」按鈕
- *  Step 3 — Dispatch  : 顯示 QR Code + iOS 一鍵安裝按鈕（LPA 格式）
- *                       WM 廠商顯示「已寄送兌換碼」畫面
- *                       DJB 處理中顯示「eSIM 準備中」畫面
+ * # v2.1.0 | 2026-05-14 | Multi-PIN：Step 1 拆成兩階段，第二階段收集所有電子票券序號
+ * # v2.0.0 | 原始 Apple Minimalist 重構版
  *
- * 【API 回傳格式】
- *  單件：{ success, order_id, product_name, vendor, qr_code_data, message }
- *  多件：{ success, items: [{ order_id, product_name, vendor, qr_code_data }] }
- *        （多件格式為未來擴充，目前後端統一回傳單件）
+ * 【UX 流程（v2.1）】
+ *  Step 1a — 訂單驗證 : 輸入 MOMO 訂單編號 + Email → 呼叫 /api/verify → 得到 qty
+ *  Step 1b — 票券序號 : 顯示 qty 個輸入框（12 碼英數字）→ 呼叫 /api/claim → 發貨
+ *  Step 2  — Card List : 若 qty > 1，顯示商品卡片列表
+ *  Step 3  — Dispatch  : 顯示 QR Code（DJB / WM / Pending 三種畫面）
  *
  * 【QR Code 類型判斷】
  *  qr_code_data.startsWith('LPA:')        → DJB eSIM，顯示 QR + iOS 安裝鈕
@@ -278,6 +275,9 @@ function getQrType(qr_code_data) {
   return 'djb';  // LPA: 或 https:// 都走 DJB 顯示
 }
 
+// ─── 電子票券序號格式正則（12 碼英數字）────────────────────────────────────
+const CUSTOMER_PIN_REGEX = /^[A-Za-z0-9]{12}$/;
+
 // ─── 主頁面 ────────────────────────────────────────────────────────────────
 export default function ClaimPage() {
   // ── 表單狀態 ──
@@ -286,52 +286,89 @@ export default function ClaimPage() {
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
 
-  // ── 步驟狀態（1=Login, 2=CardList, 3=Dispatch） ──
+  // ── 步驟狀態（1=訂單驗證, 1b=票券序號, 2=CardList, 3=Dispatch） ──
   const [step,          setStep]          = useState(1);
-  const [items,         setItems]         = useState([]);      // 正規化後的商品陣列
-  const [activeItem,    setActiveItem]    = useState(null);    // 當前顯示的商品（Step 3）
-  const [claimingId,    setClaimingId]    = useState(null);    // 正在領取的 order_id
-  // 特殊業務狀態（覆蓋步驟流程，直接顯示說明頁）
-  // 'TICKET_REFUNDED' → 票券已退款 / 作廢 / 查無此票
+  const [phase,         setPhase]         = useState('order');  // 'order' | 'pins'
+  const [verifiedQty,   setVerifiedQty]   = useState(1);        // 從 /api/verify 拿到的張數
+  const [ticketPins,    setTicketPins]    = useState(['']);      // 電子票券序號輸入陣列
+  const [items,         setItems]         = useState([]);
+  const [activeItem,    setActiveItem]    = useState(null);
+  const [claimingId,    setClaimingId]    = useState(null);
   const [specialStatus, setSpecialStatus] = useState(null);
 
-  const canSubmit = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
+  const canSubmitOrder = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
+  const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !loading;
 
-  // ── Step 1：送出訂單編號 + Email ──────────────────────────────────────
-  const handleLogin = async (e) => {
+  // ── Step 1a：送出訂單編號 + Email → 驗證 qty ─────────────────────────
+  const handleVerify = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/claim', {
+      const res  = await fetch('/api/verify', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ orderNo: orderNo.trim(), email: email.trim() }),
       });
-
       const data = await res.json();
 
-      // 特殊業務狀態：票券已退款 / 作廢 / 查無此票
-      // → 不顯示 error 彈窗，平滑切換至說明頁
-      if (data.status === 'TICKET_REFUNDED') {
+      if (data.status === 'ORDER_RECOVERING') {
         setSpecialStatus('TICKET_REFUNDED');
         return;
       }
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
+      }
 
+      // 依 qty 建立對應數量的空輸入框
+      const qty = data.qty || 1;
+      setVerifiedQty(qty);
+      setTicketPins(Array(qty).fill(''));
+      setPhase('pins');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 1b：送出所有電子票券序號 → 發貨 ────────────────────────────
+  const handleClaim = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res  = await fetch('/api/claim', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          orderNo:    orderNo.trim(),
+          email:      email.trim(),
+          ticketPins: ticketPins.map(p => p.trim()),
+        }),
+      });
+      const data = await res.json();
+
+      if (data.status === 'ORDER_RECOVERING' || data.status === 'TICKET_REFUNDED') {
+        setSpecialStatus('TICKET_REFUNDED');
+        return;
+      }
       if (!res.ok) {
         throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
+      }
+      if (!data.success) {
+        throw new Error(data.message || data.error || '處理失敗，請聯繫客服');
       }
 
       const normalized = normalizeResponse(data);
       setItems(normalized);
 
       if (normalized.length === 1) {
-        // 單件直接跳 Step 3
         setActiveItem(normalized[0]);
         setStep(3);
       } else {
-        // 多件進 Card List
         setStep(2);
       }
     } catch (err) {
@@ -342,10 +379,9 @@ export default function ClaimPage() {
   };
 
   // ── Step 2：Card List 點擊「領取」───────────────────────────────────────
-  const handleClaim = useCallback((item) => {
+  const handleSelectItem = useCallback((item) => {
     setActiveItem(item);
     setStep(3);
-    // 標記該 item 已領取（更新 items 陣列）
     setItems(prev => prev.map(i =>
       i.order_id === item.order_id ? { ...i, dispatched: true } : i
     ));
@@ -366,6 +402,9 @@ export default function ClaimPage() {
     setActiveItem(null);
     setClaimingId(null);
     setSpecialStatus(null);
+    setPhase('order');
+    setVerifiedQty(1);
+    setTicketPins(['']);
     setStep(1);
   }, []);
 
@@ -374,6 +413,12 @@ export default function ClaimPage() {
 
   // ── 多件時返回按鈕設定 ────────────────────────────────────────────────
   const backHandler = items.length > 1 ? handleBackToList : null;
+
+  // ── 票券序號輸入框更新 ────────────────────────────────────────────────
+  const handlePinChange = (idx, val) => {
+    setTicketPins(prev => prev.map((p, i) => i === idx ? val : p));
+    setError('');
+  };
 
   return (
     <>
@@ -402,9 +447,9 @@ export default function ClaimPage() {
           {/* ── 步驟進度條 + 步驟內容（特殊狀態時整體隱藏） ── */}
           {!specialStatus && <StepBar step={step} />}
 
-          {/* ════════════════ STEP 1：Login ════════════════ */}
-          {!specialStatus && step === 1 && (
-            <form className="form" onSubmit={handleLogin} autoComplete="off">
+          {/* ════════════════ STEP 1a：輸入訂單編號 + Email ════════════════ */}
+          {!specialStatus && step === 1 && phase === 'order' && (
+            <form className="form" onSubmit={handleVerify} autoComplete="off">
 
               <div className="field">
                 <label>MOMO 訂單編號</label>
@@ -439,11 +484,65 @@ export default function ClaimPage() {
                 </div>
               )}
 
-              <button type="submit" className="btn-submit" disabled={!canSubmit}>
+              <button type="submit" className="btn-submit" disabled={!canSubmitOrder}>
+                {loading
+                  ? <><span className="spinner" /> 驗證中，請稍候...</>
+                  : '下一步 →'
+                }
+              </button>
+
+            </form>
+          )}
+
+          {/* ════════════════ STEP 1b：輸入電子票券序號 ════════════════ */}
+          {!specialStatus && step === 1 && phase === 'pins' && (
+            <form className="form" onSubmit={handleClaim} autoComplete="off">
+
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: 10, fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+                📋 訂單共 <strong style={{ color: 'var(--brand)' }}>{verifiedQty} 張</strong> eSIM，請輸入所有電子票券序號才能領取。
+              </div>
+
+              {ticketPins.map((pin, idx) => (
+                <div className="field" key={idx}>
+                  <label>電子票券序號 {verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}</label>
+                  <input
+                    type="text"
+                    placeholder="12 碼英數字，例：AB1234567890"
+                    value={pin}
+                    onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
+                    autoFocus={idx === 0}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={12}
+                    style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                  />
+                  {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
+                    <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
+                  )}
+                </div>
+              ))}
+
+              {error && (
+                <div className="error-box">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button type="submit" className="btn-submit" disabled={!canSubmitPins}>
                 {loading
                   ? <><span className="spinner" /> 核銷中，請稍候...</>
                   : '核銷領取 eSIM →'
                 }
+              </button>
+
+              <button
+                type="button"
+                className="btn-submit"
+                style={{ marginTop: 8, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                onClick={() => { setPhase('order'); setError(''); }}
+              >
+                ← 修改訂單編號
               </button>
 
             </form>
@@ -462,7 +561,7 @@ export default function ClaimPage() {
                   <ItemCard
                     key={item.order_id || i}
                     item={item}
-                    onClaim={handleClaim}
+                    onClaim={handleSelectItem}
                     claiming={claimingId === item.order_id}
                   />
                 ))}

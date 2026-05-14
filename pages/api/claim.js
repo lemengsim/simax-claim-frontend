@@ -2,12 +2,15 @@
  * 檔案：pages/api/claim.js
  * 模組：前台領取 API（Next.js Serverless Function）
  *
+ * # v2.1.0 | 2026-05-14 | 接受 ticketPins[] 陣列，配合 Multi-PIN 核銷流程
+ * # v2.0.0 | 原始版本
+ *
  * 【架構切換 — 電子票券即時核銷版】
  *  舊版：查詢 Supabase 已發貨記錄 → 回傳 QR Code
  *  新版：轉發至 GCP Express API → 即時驗證票券 + 發貨 + 核銷 → 回傳 QR Code
  *
  * POST /api/claim
- * Body: { ticketPin: string, email: string }
+ * Body: { orderNo: string, email: string, ticketPins: string[] }
  *
  * 流程：
  *  1. 驗證 payload
@@ -36,7 +39,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: '不支援此 HTTP Method' });
   }
 
-  const { orderNo, email } = req.body || {};
+  const { orderNo, email, ticketPins } = req.body || {};
 
   // ── 1. 基本驗證 ──────────────────────────────────────────────────────────
   if (!orderNo || orderNo.trim().length === 0) {
@@ -45,6 +48,10 @@ export default async function handler(req, res) {
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     return res.status(400).json({ error: '請輸入有效的 Email' });
+  }
+
+  if (!Array.isArray(ticketPins) || ticketPins.length === 0) {
+    return res.status(400).json({ error: '請輸入電子票券序號' });
   }
 
   // ── 2. 確認 GCP 設定 ─────────────────────────────────────────────────────
@@ -65,6 +72,7 @@ export default async function handler(req, res) {
       body:    JSON.stringify({
         orderNo:     orderNo.trim(),
         email:       email.trim().toLowerCase(),
+        ticketPins:  ticketPins.map(p => p.trim()),
         internalKey: gcpApiKey || '',
       }),
       // 注意：Node.js fetch 預設無 timeout；GCP 端有 25s 個別請求逾時
