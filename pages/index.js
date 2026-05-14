@@ -72,7 +72,7 @@ function ItemCard({ item, onClaim, claiming }) {
         </div>
       </div>
       {isClaimed ? (
-        <button className="btn-claimed" disabled>已領取 ✓</button>
+        <button className="btn-claimed" onClick={() => onClaim(item)}>查看 QR →</button>
       ) : (
         <button
           className="btn-claim"
