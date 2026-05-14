@@ -25,8 +25,9 @@ import Head from 'next/head';
 import { useState, useCallback, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
-// localStorage key
+// localStorage keys
 const LS_EMAIL_KEY = 'simax_saved_email';
+const LS_CLAIM_KEY = 'simax_last_claim';
 
 // ─── 常數 ──────────────────────────────────────────────────────────────────
 const IOS_SETUP_BASE = 'https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=';
@@ -305,6 +306,19 @@ export default function ClaimPage() {
   const hasDuplicatePin = ticketPins.length > 1 && new Set(ticketPins.map(p => p.trim().toUpperCase()).filter(p => p)).size < ticketPins.filter(p => p.trim()).length;
   const canSubmitPins  = ticketPins.every(p => CUSTOMER_PIN_REGEX.test(p.trim())) && !hasDuplicatePin && !loading;
 
+  // ── mount：還原上次領取記錄 ───────────────────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_CLAIM_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          setItems(parsed);
+          setStep(2);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   // ── Step 1a：送出訂單編號 + Email → 驗證 qty ─────────────────────────
   const handleVerify = async (e) => {
@@ -371,6 +385,7 @@ export default function ClaimPage() {
 
       const normalized = normalizeResponse(data);
       setItems(normalized);
+      try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify(normalized)); } catch { /* ignore */ }
 
       if (normalized.length === 1) {
         setActiveItem(normalized[0]);
@@ -404,7 +419,7 @@ export default function ClaimPage() {
   const handleReset = useCallback(() => {
     setOrderNo('');
     setEmail('');
-    try { localStorage.removeItem(LS_EMAIL_KEY); } catch {}
+    try { localStorage.removeItem(LS_EMAIL_KEY); localStorage.removeItem(LS_CLAIM_KEY); } catch {}
     setError('');
     setItems([]);
     setActiveItem(null);
