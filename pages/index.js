@@ -556,7 +556,7 @@ export default function ClaimPage() {
                 type="button"
                 className="btn-secondary"
                 style={{ marginTop: 8 }}
-                onClick={() => { setPhase('order'); setError(''); setTicketPins(Array(verifiedQty).fill('')); }}
+                onClick={() => { setPhase('order'); setError(''); setTicketPins(Array(verifiedQty).fill('')); setEmail(''); try { localStorage.removeItem(LS_EMAIL_KEY); } catch {} }}
               >
                 ← 回上一頁
               </button>
