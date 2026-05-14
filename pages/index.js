@@ -412,11 +412,8 @@ export default function ClaimPage() {
   // ── 全部重置（返回 Step 1） ─────────────────────────────────────────
   const handleReset = useCallback(() => {
     setOrderNo('');
-    // Email 不清空：從 localStorage 還原，讓使用者重查時自動帶入同一信箱
-    try {
-      const saved = localStorage.getItem(LS_EMAIL_KEY);
-      setEmail(saved || '');
-    } catch { setEmail(''); }
+    setEmail('');
+    try { localStorage.removeItem(LS_EMAIL_KEY); } catch {}
     setError('');
     setItems([]);
     setActiveItem(null);
