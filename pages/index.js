@@ -108,7 +108,16 @@ function ResultDjb({ item, onBack }) {
     <div className="result-card">
       <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
       <div className="result-title">eSIM 領取成功！</div>
-      <div className="result-sub">
+
+      {/* 商品資訊 */}
+      {item.product_name && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', margin: '10px 0 4px', textAlign: 'left' }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>您的 eSIM 方案</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{item.product_name}</div>
+        </div>
+      )}
+
+      <div className="result-sub" style={{ marginTop: 8 }}>
         {isLpa
           ? '點擊下方按鈕，或掃描 QR Code 在 iPhone 上安裝 eSIM'
           : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
@@ -175,6 +184,12 @@ function ResultWm({ item, email, onBack }) {
     <div className="result-wm">
       <div style={{ fontSize: 40, marginBottom: 12 }}>✉️</div>
       <div className="result-title">兌換碼已寄出！</div>
+      {item.product_name && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', margin: '10px 0 4px', textAlign: 'left' }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>您的 eSIM 方案</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{item.product_name}</div>
+        </div>
+      )}
       <div className="result-sub" style={{ marginBottom: 16 }}>
         世界移動將於數分鐘內將兌換碼寄至<br />
         <strong style={{ color: 'var(--brand)' }}>{email}</strong>
@@ -239,6 +254,12 @@ function ResultPending({ item, onBack }) {
     <div className="status-pending">
       <div className="icon">⏳</div>
       <h3>eSIM 準備中</h3>
+      {item.product_name && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 16px', margin: '8px 0', textAlign: 'left' }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>您的 eSIM 方案</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{item.product_name}</div>
+        </div>
+      )}
       <p>
         您的訂單 <strong style={{ color: '#f59e0b' }}>{item.order_id}</strong><br />
         正在建立 eSIM，通常需要 5–15 分鐘，<br />請稍候後重新輸入序號查詢。
