@@ -521,21 +521,17 @@ export default function ClaimPage() {
 
               {ticketPins.map((pin, idx) => (
                 <div className="field" key={idx}>
-                  <div className="pin-input-wrap">
-                    <span className="pin-input-label">
-                      電子票券序號{verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}　共12碼
-                    </span>
-                    <input
-                      type="text"
-                      placeholder=""
-                      value={pin}
-                      onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
-                      autoFocus={idx === 0}
-                      autoComplete="off"
-                      spellCheck={false}
-                      maxLength={12}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder={`電子票券序號${verifiedQty > 1 ? `（第 ${idx + 1} 張）` : ''}　共12碼`}
+                    value={pin}
+                    onChange={(e) => handlePinChange(idx, e.target.value.toUpperCase())}
+                    autoFocus={idx === 0}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={12}
+                    style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                  />
                   {pin.length > 0 && !CUSTOMER_PIN_REGEX.test(pin.trim()) && (
                     <span className="hint" style={{ color: '#ef4444' }}>⚠️ 需為 12 碼英數字</span>
                   )}
