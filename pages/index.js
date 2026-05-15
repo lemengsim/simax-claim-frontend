@@ -1,7 +1,9 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.17 — 二次領取免輸入票券）
+ * 模組：SIMAX eSIM 領取中心前台（v2.19 — 二次領取多件展開修正）
  *
+ * # v2.19.0 | 2026-05-15 | 二次領取：展開 JSON 陣列格式 qr_code_data，多件正確顯示 Step 2
+ * # v2.18.0 | 2026-05-15 | 啟用碼/訂單編號改為點擊整列複製；移除複製按鈕
  * # v2.17.0 | 2026-05-15 | 二次領取：verify 回傳 existingItems 時跳過 PIN 直接顯示 QR；Step 3 加客服連結
  * # v2.16.0 | 2026-05-15 | 售後客服改彈窗，顯示訂單編號讓顧客先複製再前往客服
  * # v2.15.0 | 2026-05-15 | 訂單編號一鍵複製；Footer 加售後客服連結
@@ -169,22 +171,26 @@ function ResultDjb({ item, onBack }) {
 
       {/* 資訊列：啟用碼 / 訂單編號 / ICCID */}
       <div style={{ width: '100%', marginTop: 16, borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', textAlign: 'left' }}>
-        {/* 啟用碼 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>啟用碼</div>
-            <div style={{ fontFamily: "'SF Mono', 'Menlo', monospace", fontSize: 13, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.6 }}>{qr}</div>
+        {/* 啟用碼 — 點擊整列複製 */}
+        <div
+          onClick={handleCopy}
+          style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: copied ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}
+        >
+          <div style={{ fontSize: 11, color: copied ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
+            {copied ? '✓ 已複製' : '啟用碼　點擊複製'}
           </div>
-          <button className="btn-copy" onClick={handleCopy} style={{ marginLeft: 10, flexShrink: 0, marginTop: 2 }}>{copied ? '✓' : '複製'}</button>
+          <div style={{ fontFamily: "'SF Mono', 'Menlo', monospace", fontSize: 13, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.6 }}>{qr}</div>
         </div>
-        {/* 訂單編號 */}
+        {/* 訂單編號 — 點擊整列複製 */}
         {item.order_id && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>訂單編號</div>
-              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{item.order_id}</div>
+          <div
+            onClick={handleCopyId}
+            style={{ padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none', cursor: 'pointer', background: copiedId ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}
+          >
+            <div style={{ fontSize: 11, color: copiedId ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
+              {copiedId ? '✓ 已複製' : '訂單編號　點擊複製'}
             </div>
-            <button className="btn-copy" onClick={handleCopyId} style={{ marginLeft: 10, flexShrink: 0, marginTop: 2 }}>{copiedId ? '✓' : '複製'}</button>
+            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{item.order_id}</div>
           </div>
         )}
         {/* ICCID */}
@@ -388,9 +394,31 @@ export default function ClaimPage() {
       // ① 若 Supabase 已有出貨記錄（任何裝置二次領取），直接跳過 PIN
       if (data.existingItems && data.existingItems.length > 0) {
         const ei = data.existingItems;
-        setItems(ei);
-        try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify({ orderNo: orderNo.trim(), items: ei })); } catch { /* ignore */ }
-        if (ei.length === 1) { setActiveItem(ei[0]); setStep(3); }
+
+        // 展開 JSON 陣列格式的 qr_code_data（多件訂單儲存為單一記錄時）
+        const expandedItems = [];
+        for (const item of ei) {
+          if (item.qr_code_data && item.qr_code_data.startsWith('[')) {
+            try {
+              const qrArr = JSON.parse(item.qr_code_data);
+              if (Array.isArray(qrArr) && qrArr.length > 0) {
+                qrArr.forEach((qr, idx) => expandedItems.push({
+                  ...item,
+                  order_id:     `${item.order_id}-item${idx + 1}`,
+                  qr_code_data: qr,
+                }));
+              } else {
+                expandedItems.push(item);
+              }
+            } catch { expandedItems.push(item); }
+          } else {
+            expandedItems.push(item);
+          }
+        }
+
+        setItems(expandedItems);
+        try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify({ orderNo: orderNo.trim(), items: expandedItems })); } catch { /* ignore */ }
+        if (expandedItems.length === 1) { setActiveItem(expandedItems[0]); setStep(3); }
         else { setStep(2); }
         return;
       }
