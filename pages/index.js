@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.22 — Step 3 去多餘框線，清爽化）
+ * 模組：SIMAX eSIM 領取中心前台（v2.23 — 複製列改 Icon 顯示）
  *
+ * # v2.23.0 | 2026-05-15 | 啟用碼/訂單編號列：「點擊複製」文字改為小複製 Icon
  * # v2.22.0 | 2026-05-15 | Step 3：移除 QR 白框卡片、方案卡去 border/shadow，整體更清爽
  * # v2.21.0 | 2026-05-15 | Step 3：拿掉標題、方案卡改數位票卡風格、QR Code 加白框陰影、間距優化
  * # v2.20.0 | 2026-05-15 | Step 1/2/3 統一顯示「需要協助？聯繫售後客服」；移除 Footer 客服按鈕
@@ -201,22 +202,39 @@ function ResultDjb({ item, onBack }) {
 
       {/* ── 資訊列：啟用碼 / 訂單編號 / ICCID ── */}
       <div style={{ width: '100%', marginTop: 20, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', textAlign: 'left' }}>
+
         {/* 啟用碼 */}
         <div onClick={handleCopy} style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: copied ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}>
-          <div style={{ fontSize: 11, color: copied ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
-            {copied ? '✓ 已複製' : '啟用碼　點擊複製'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>啟用碼</div>
+            {copied
+              ? <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>✓ 已複製</span>
+              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+            }
           </div>
           <div style={{ fontFamily: "'SF Mono', 'Menlo', monospace", fontSize: 13, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.6 }}>{qr}</div>
         </div>
+
         {/* 訂單編號 */}
         {item.order_id && (
           <div onClick={handleCopyId} style={{ padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none', cursor: 'pointer', background: copiedId ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}>
-            <div style={{ fontSize: 11, color: copiedId ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
-              {copiedId ? '✓ 已複製' : '訂單編號　點擊複製'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>訂單編號</div>
+              {copiedId
+                ? <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>✓ 已複製</span>
+                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+              }
             </div>
             <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{item.order_id}</div>
           </div>
         )}
+
         {/* ICCID */}
         {item.iccid && (
           <div style={{ padding: '12px 14px' }}>
@@ -224,6 +242,7 @@ function ResultDjb({ item, onBack }) {
             <div style={{ fontFamily: "'SF Mono', 'Menlo', monospace", fontSize: 13, color: 'var(--text)', letterSpacing: '0.3px', lineHeight: 1.4 }}>{item.iccid}</div>
           </div>
         )}
+
       </div>
 
       {/* ── 截圖提醒 ── */}
