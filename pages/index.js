@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.23 — 複製列改 Icon 顯示）
+ * 模組：SIMAX eSIM 領取中心前台（v2.24 — Step 3 加「重發信件」按鈕）
  *
+ * # v2.24.0 | 2026-05-15 | Step 3 新增「重發確認信件」按鈕，呼叫 /api/resend-notify
  * # v2.23.0 | 2026-05-15 | 啟用碼/訂單編號列：「點擊複製」文字改為小複製 Icon
  * # v2.22.0 | 2026-05-15 | Step 3：移除 QR 白框卡片、方案卡去 border/shadow，整體更清爽
  * # v2.21.0 | 2026-05-15 | Step 3：拿掉標題、方案卡改數位票卡風格、QR Code 加白框陰影、間距優化
@@ -386,6 +387,8 @@ export default function ClaimPage() {
   const [specialStatus, setSpecialStatus] = useState(null);
   const [showCsModal,   setShowCsModal]   = useState(false);
   const [csCopied,      setCsCopied]      = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone,    setResendDone]    = useState(false);
 
   const canSubmitOrder = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
   const hasDuplicatePin = ticketPins.length > 1 && new Set(ticketPins.map(p => p.trim().toUpperCase()).filter(p => p)).size < ticketPins.filter(p => p.trim()).length;
@@ -566,6 +569,22 @@ export default function ClaimPage() {
     setTicketPins(['']);
     setStep(1);
   }, []);
+
+  // ── 重發確認信件 ──────────────────────────────────────────────────────
+  const handleResendEmail = useCallback(async () => {
+    if (!activeItem || resendLoading || resendDone) return;
+    setResendLoading(true);
+    try {
+      await fetch('/api/resend-notify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderId: activeItem.order_id, email: email.trim() }),
+      });
+      setResendDone(true);
+      setTimeout(() => setResendDone(false), 6000);
+    } catch { /* ignore */ }
+    finally { setResendLoading(false); }
+  }, [activeItem, email, resendLoading, resendDone]);
 
   // ── 當前 Step 3 顯示類型 ─────────────────────────────────────────────
   const qrType = activeItem ? getQrType(activeItem.qr_code_data) : null;
@@ -796,7 +815,29 @@ export default function ClaimPage() {
                 </button>
               </div>
 
-              <div style={{ textAlign: 'center', marginTop: 14 }}>
+              {/* 重發信件 */}
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <button
+                  onClick={handleResendEmail}
+                  disabled={resendLoading || resendDone}
+                  style={{
+                    background: resendDone ? 'rgba(99,102,241,0.08)' : 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    padding: '10px 20px',
+                    fontSize: 13,
+                    color: resendDone ? 'var(--brand)' : 'var(--muted)',
+                    cursor: resendLoading || resendDone ? 'default' : 'pointer',
+                    width: '100%',
+                    fontWeight: resendDone ? 600 : 400,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {resendLoading ? '寄送中...' : resendDone ? '✓ 確認信已重發至您的信箱' : '📧 重發確認信件'}
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: 10 }}>
                 <button
                   onClick={() => { setShowCsModal(true); setCsCopied(false); }}
                   style={{ background: 'none', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
