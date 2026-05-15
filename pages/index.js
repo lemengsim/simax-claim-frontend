@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.21 — Step 3 視覺大改版：數位票卡 + QR 白框卡片）
+ * 模組：SIMAX eSIM 領取中心前台（v2.22 — Step 3 去多餘框線，清爽化）
  *
+ * # v2.22.0 | 2026-05-15 | Step 3：移除 QR 白框卡片、方案卡去 border/shadow，整體更清爽
  * # v2.21.0 | 2026-05-15 | Step 3：拿掉標題、方案卡改數位票卡風格、QR Code 加白框陰影、間距優化
  * # v2.20.0 | 2026-05-15 | Step 1/2/3 統一顯示「需要協助？聯繫售後客服」；移除 Footer 客服按鈕
  * # v2.19.0 | 2026-05-15 | 二次領取：展開 JSON 陣列格式 qr_code_data，多件正確顯示 Step 2
@@ -126,16 +127,14 @@ function ResultDjb({ item, onBack }) {
   return (
     <div className="result-card">
 
-      {/* ── 數位票卡：方案資訊 ── */}
+      {/* ── 方案資訊 ── */}
       {item.product_name && (
         <div style={{
           background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-          borderRadius: 18,
-          padding: '18px 20px',
+          borderRadius: 14,
+          padding: '16px 18px',
           marginTop: 4,
           textAlign: 'left',
-          boxShadow: '0 2px 16px rgba(99,102,241,0.13)',
-          border: '1px solid rgba(99,102,241,0.15)',
         }}>
           <div style={{ fontSize: 10, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 10, fontWeight: 700 }}>
             📡 &nbsp;您的 eSIM 方案
@@ -145,8 +144,8 @@ function ResultDjb({ item, onBack }) {
               {planParts.map((part, i) => (
                 <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
                   <span style={{
-                    fontSize: i === 0 ? 18 : 15,
-                    fontWeight: i === 0 ? 700 : 500,
+                    fontSize: 16,
+                    fontWeight: 600,
                     color: 'var(--text)',
                     lineHeight: 1.3,
                   }}>{part}</span>
@@ -167,16 +166,8 @@ function ResultDjb({ item, onBack }) {
         {isLpa ? '點擊下方按鈕，或長按 QR Code 儲存圖片' : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
       </div>
 
-      {/* ── QR Code：白色圓角卡片包裝 ── */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: 20,
-        padding: 20,
-        display: 'flex',
-        justifyContent: 'center',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.09)',
-        border: '1px solid rgba(0,0,0,0.06)',
-      }}>
+      {/* ── QR Code ── */}
+      <div className="qr-wrap">
         <QRCodeCanvas
           value={qr}
           size={200}
