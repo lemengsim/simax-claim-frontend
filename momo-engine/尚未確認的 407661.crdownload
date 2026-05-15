@@ -1,0 +1,602 @@
+/**
+ * 檔案：express-server.js
+ * 模組：GCP 內部 API 伺服器（Express.js）
+ *
+ * 【v2 架構 — 2026-04-24】
+ *  1. 日誌寫入統一走 sheets-writer（API Primary + Webhook Fallback）
+ *  2. dispatchOrder 回傳 { qrCode, iccid, vendorOrderId }，新欄位寫入 Supabase
+ *  3. 啟動時同步啟動 status-reconciler 排程（每 30 分對帳）
+ *  4. 即時核銷狀態統一為「已出票」，由排程負責後續狀態轉移
+ *
+ * 對外開放一支 API：
+ *  POST /api/internal/redeem
+ *  Body:  { orderNo: string, email: string, internalKey: string }
+ */
+
+'use strict';
+
+const express          = require('express');
+const { createClient } = require('@supabase/supabase-js');
+
+const { verifyMomoOrder, fetchRefundOrdersC1105 } = require('./momo-ingest');
+const { mapProductToVendor, getDictionary, clearCache } = require('./core-mapper');
+const { dispatchOrder }      = require('./dispatch-worker');
+const sheetsWriter           = require('./sheets-writer');
+const notifyOrder              = require('./notify-order');
+const { startReconcilerCron, STATUS } = require('./status-reconciler');
+
+// ── Supabase ─────────────────────────────────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+  { auth: { persistSession: false } }
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Sheets 寫入：本檔只做「組 row」+「呼叫 sheets-writer」
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 組一筆 15 欄陣列（A–O），對應「自助領取紀錄」分頁
+ */
+function buildLogRow(params) {
+  const {
+    orderTime, platform, orderId, ticketPin, customerPin, customerEmail,
+    planTitle, spec, qty, sellingPrice,
+    vendorCode, vendorName, vendorSpec, vendorDays, cost,
+    qrCodeOrStatus,
+  } = params;
+
+  return [
+    orderTime       || '',        // A 訂單時間
+    new Date().toISOString(),     // B 時間戳記（寫入當下）
+    platform        || '',        // C 平台
+    orderId         || '',        // D 訂單編號（upsert 主鍵）
+    ticketPin       || '',        // E 票券 PIN
+
+    customerPin   || '',         // F 客戶輸入 PIN (買家填)
+    customerEmail   || '',        // G 客戶 Email
+    planTitle       || '',        // H 商品名稱
+    spec            || '',        // I 規格
+    qty             ?? 1,         // J 數量
+    sellingPrice    ?? '',        // K 售價
+    vendorCode      || '',        // L 廠商代碼
+    vendorName      || '',        // M 廠商品名
+    vendorSpec      || '',        // N 廠商規格
+    vendorDays    ?? 0,   // O 天數
+    cost            ?? '',        // P 廠商成本
+    qrCodeOrStatus  || '',        // P 狀態／QR
+  ];
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Express App
+// ══════════════════════════════════════════════════════════════════════════════
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+// ── CORS（供本地 HTML 按鈕從桌面 file:// 呼叫）─────────────────────────────
+// 僅對管理用 endpoint 開放；redeem 不開放（Vercel 端會幫前台處理 CORS）
+const _adminCors = (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin',  '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+};
+app.use('/api/internal/reconcile',    _adminCors);
+app.use('/api/internal/force-refund', _adminCors);
+
+// 健康檢查
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
+// ── 手動旗標：強制標記某基號為「已退貨」───────────────────────────────────
+// 用途：MOMO recoverCompanyQuery API 可能漏判早期退貨（狀態 = 退款中 / 待收退貨），
+//       管理員在 MOMO 後台看到訂單已退貨，透過此端點強制旗標。
+// 機制：
+//   1. Supabase orders.telecom_status 設為 '已退貨'（如果 row 存在就 update，沒有就 insert 最小欄位）
+//   2. 呼叫 sheets-writer.markRefundByBase 掃 E 欄、把所有匹配 rows 的 O 欄設為 '已退貨'
+//   3. status-reconciler 之後會認得 cachedRow.telecom_status = '已退貨' 並 sticky 保留不覆寫
+//
+// POST /api/internal/force-refund
+// Body:  { orderNo: string (基號或完整子訂單都可), internalKey: string }
+app.post('/api/internal/force-refund', async (req, res) => {
+  const { orderNo, internalKey } = req.body || {};
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && internalKey !== expectedKey) {
+    return res.status(401).json({ success: false, error: '授權失敗' });
+  }
+  if (!orderNo || !String(orderNo).trim()) {
+    return res.status(400).json({ success: false, error: '請提供 orderNo' });
+  }
+
+  const baseOrderNo = String(orderNo).trim().split('-')[0];
+  if (baseOrderNo.length !== 14) {
+    return res.status(400).json({
+      success: false,
+      error: `orderNo 基號長度異常 (${baseOrderNo.length})，應為 14 碼 MOMO 訂單基號`,
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  // ── 1. Supabase 更新（存在則 update，不存在則 insert 最小旗標列）──────────
+  let supabaseAction = 'unknown';
+  try {
+    const { data: existing } = await supabase
+      .from('orders')
+      .select('id, order_id, telecom_status')
+      .eq('order_id', baseOrderNo)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('orders')
+        .update({
+          telecom_status:     STATUS.REFUNDED,
+          last_reconciled_at: nowIso,
+        })
+        .eq('id', existing.id);
+      supabaseAction = 'updated';
+    } else {
+      await supabase.from('orders').insert({
+        order_id:           baseOrderNo,
+        platform:           'MOMO',
+        ticket_pin:         baseOrderNo,
+        product_name:       '[MANUAL_REFUND_MARK]',
+        status:             'failed',
+        telecom_status:     STATUS.REFUNDED,
+        last_reconciled_at: nowIso,
+        created_at:         nowIso,
+      });
+      supabaseAction = 'inserted';
+    }
+  } catch (dbErr) {
+    console.error(`[force-refund] Supabase 失敗: ${dbErr.message}`);
+    return res.status(500).json({ success: false, error: `Supabase 失敗: ${dbErr.message}` });
+  }
+
+  // ── 2. Sheets 強制標記（透過 webhook markRefundByBase action）────────────
+  let sheetResult;
+  try {
+    sheetResult = await sheetsWriter.markRefundByBase(baseOrderNo);
+  } catch (err) {
+    console.error(`[force-refund] Sheets 失敗: ${err.message}`);
+    return res.status(500).json({
+      success:       false,
+      error:         `Sheets 失敗: ${err.message}`,
+      supabase:      supabaseAction,
+      baseOrderNo,
+    });
+  }
+
+  console.log(`[force-refund] ✅ base=${baseOrderNo} supabase=${supabaseAction} sheet.updated=${sheetResult.updated}`);
+
+  return res.json({
+    success:      true,
+    baseOrderNo,
+    supabase:     supabaseAction,
+    sheetUpdated: sheetResult.updated,
+    message:      `已把 ${baseOrderNo} 標記為已退貨（Sheets ${sheetResult.updated} 列 / Supabase ${supabaseAction}）`,
+  });
+});
+
+// 手動觸發排程（除錯用；需帶 INTERNAL_API_KEY 保護）
+app.post('/api/internal/reconcile', async (req, res) => {
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && req.body?.internalKey !== expectedKey) {
+    return res.status(401).json({ success: false, error: '授權失敗' });
+  }
+  try {
+    const { runReconciliation } = require('./status-reconciler');
+    const result = await runReconciliation();
+    return res.json({ success: true, result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── 手動刷新字典快取
+app.post('/api/admin/refresh-dict', async (req, res) => {
+  const { internalKey } = req.body || {};
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && internalKey !== expectedKey) {
+    return res.status(401).json({ success: false, error: 'Auth failed' });
+  }
+  try {
+    clearCache();
+    const dict = await getDictionary();
+    console.log('[express] Refreshed dict: ' + dict.length + ' items');
+    return res.json({ success: true, count: dict.length, ts: new Date().toISOString() });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// ── 主核銷 API ────────────────────────────────────────────────────────────────
+app.post('/api/internal/redeem', async (req, res) => {
+  const { orderNo, email, ticketPin: customerPin, internalKey } = req.body || {};
+
+  console.log(`\n[express] ===== 兌換請求 ${new Date().toISOString()} =====`);
+  console.log(`[express] orderNo=${orderNo} email=${email}`);
+
+  // ── 1. 內部金鑰驗證 ────────────────────────────────────────────────────────
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && internalKey !== expectedKey) {
+    console.warn('[express] ⚠️  internalKey 驗證失敗');
+    return res.status(401).json({ success: false, error: '授權失敗' });
+  }
+
+  // ── 2. 基本欄位驗證 ────────────────────────────────────────────────────────
+  if (!orderNo || orderNo.trim().length === 0) {
+    return res.status(400).json({ success: false, error: '請輸入 MOMO 訂單編號' });
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ success: false, error: '請輸入有效的 Email' });
+  }
+
+  const momoOrderNo   = orderNo.trim();
+  const customerEmail = email.trim().toLowerCase();
+  const baseOrderNo   = momoOrderNo.split('-')[0];
+
+  // ── 3a. 已退貨前置擋（Supabase telecom_status 為最高權限 — sticky） ─────────
+  //   來源：force-refund API 或排程自動偵測 C1105 回收頁
+  //   一旦標成「已退貨」，這道關就直接擋，不再打 MOMO / 廠商 API
+  try {
+    const { data: refundRow } = await supabase
+      .from('orders')
+      .select('telecom_status')
+      .eq('order_id', baseOrderNo)
+      .maybeSingle();
+    if (refundRow && refundRow.telecom_status === STATUS.REFUNDED) {
+      console.warn(`[express] ⚠️ Supabase telecom_status=已退貨，阻擋領取：base=${baseOrderNo}`);
+      return res.status(200).json({
+        success: false,
+        status:  'ORDER_RECOVERING',
+        message: '訂單已退貨，兌換功能已停用',
+      });
+    }
+  } catch (err) {
+    // fail-open：Supabase 查不到時不誤擋，讓後續流程繼續
+    console.warn(`[express] 退貨前置檢查失敗（fail-open）: ${err.message}`);
+  }
+
+  // —— 3b. 即時 MOMO 退貨預查（C1105 /return/ — fail-open）
+  //   來源：Supabase 還沒標到時的補位（5min cron 也會抓到）
+  //   超過 5s 就 fail-open，避免卡客戶兌換
+  try {
+    const REFUND_CHECK_TIMEOUT_MS = 5000;
+    const refundList = await Promise.race([
+      fetchRefundOrdersC1105(2),
+      new Promise((r) => setTimeout(() => r(null), REFUND_CHECK_TIMEOUT_MS)),
+    ]);
+    if (refundList === null) {
+      console.warn(`[express] ⏱即時 MOMO 退貨預查 timeout, fail-open`);
+    } else if (Array.isArray(refundList) && refundList.length > 0) {
+      const hit = refundList.some(function(o) { const raw = o.orderNo || o.ORDER_NO || o.order_no || ''; return String(raw).split('-')[0] === baseOrderNo; });
+      if (hit) {
+        console.warn(`[express] ✅即時 MOMO 偵測到退貨，立即擋下：base=${baseOrderNo}`);
+        try { await supabase.from('orders').update({ telecom_status: STATUS.REFUNDED, last_reconciled_at: new Date().toISOString() }).eq('order_id', baseOrderNo); } catch (uErr) { console.warn(`[express] 標記 Supabase 失敗：${uErr.message}`); }
+        return res.status(200).json({ success: false, status: 'ORDER_RECOVERING', message: '訂單已退貨，兌換功能已停用' });
+      }
+    }
+  } catch (mErr) {
+    console.warn(`[express] 即時 MOMO 退貨預查失敗，fail-open：${mErr.message}`);
+  }
+
+
+  // ── 3b. 重複領取防護 ──────────────────────────────────────────────────────
+  const { data: existing } = await supabase
+    .from('orders')
+    .select('order_id, status, qr_code_data, product_name, vendor, telecom_status')
+    .eq('order_id', momoOrderNo)
+    .maybeSingle();
+
+  if (existing) {
+    console.log(`[express] 此訂單已處理過：${existing.order_id} status=${existing.status}`);
+
+    // 3b. 即使快取存在，仍即時確認 MOMO 是否已進入回收流程
+    try {
+      const recheck = await verifyMomoOrder(momoOrderNo);
+      if (recheck.recovering) {
+        console.warn(`[express] ⚠️  快取訂單回收中，阻擋查詢：${momoOrderNo}`);
+
+        // 對 Sheets 寫稽核紀錄（append，狀態「已退貨」）
+        sheetsWriter.appendRow(buildLogRow({
+          orderTime:      orderInfo.orderDate || new Date().toISOString(),
+          platform:       'MOMO',
+          orderId:        momoOrderNo,
+          ticketPin:      momoOrderNo,
+          customerEmail,
+          planTitle:      `[CACHE_BLOCKED] ${recheck.goodsName || ''}`,
+          qty:            0,
+          vendorDays:   0,
+          qrCodeOrStatus: STATUS.REFUNDED,
+        })).catch(() => {});
+
+        return res.status(200).json({
+          success: false,
+          status:  'ORDER_RECOVERING',
+          message: '訂單進入回收流程，暫停兌換',
+        });
+      }
+    } catch (recheckErr) {
+      console.warn(`[express] ⚠️  快取二次驗證失敗，允許快取回傳：${recheckErr.message}`);
+    }
+
+    // 解析既有 QR codes
+    let savedCodes = [];
+    try {
+      const parsed = JSON.parse(existing.qr_code_data);
+      savedCodes = Array.isArray(parsed) ? parsed : [existing.qr_code_data];
+    } catch {
+      savedCodes = [existing.qr_code_data || ''];
+    }
+    const existingItems = savedCodes.map((qr, i) => ({
+      order_id:     savedCodes.length > 1 ? `${existing.order_id}-item${i + 1}` : existing.order_id,
+      product_name: existing.product_name || '', // 快取命中：沿用 Supabase 既有 product_name
+      vendor:       existing.vendor || '',
+      qr_code_data: qr,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      items:   existingItems,
+      message: '此訂單已兌換（重複查詢）',
+    });
+  }
+
+  // ── 4. MOMO C1105 訂單驗證 ────────────────────────────────────────────────
+  let orderInfo;
+  try {
+    orderInfo = await verifyMomoOrder(momoOrderNo);
+  } catch (err) {
+    console.error('[express] MOMO 訂單驗證失敗:', err.message);
+    return res.status(400).json({ success: false, error: `訂單驗證失敗：${err.message}` });
+  }
+  if (!orderInfo.valid) {
+    return res.status(400).json({ success: false, error: orderInfo.message || '查無此訂單或尚未完成出貨' });
+  }
+
+  // ── 4b. 退貨防禦 ──────────────────────────────────────────────────────────
+  if (orderInfo.recovering) {
+    console.warn(`[express] ⚠️  訂單回收中，阻擋兌換：${momoOrderNo}`);
+    sheetsWriter.appendRow(buildLogRow({
+      orderTime:      orderInfo.orderDate || new Date().toISOString(),
+      platform:       'MOMO',
+      orderId:        momoOrderNo,
+      ticketPin:      momoOrderNo,
+      customerEmail,
+      planTitle:      `[C1105_BLOCKED] ${orderInfo.goodsName || ''}`,
+      qty:            0,
+      vendorDays:   0,
+      qrCodeOrStatus: STATUS.REFUNDED,
+    })).catch(() => {});
+    return res.status(200).json({
+      success: false,
+      status:  'ORDER_RECOVERING',
+      message: '訂單進入回收流程，暫停兌換',
+    });
+  }
+
+  console.log(`[express] 訂單有效：goodsName="${orderInfo.goodsName}" qty=${orderInfo.qty}`);
+
+  // ── 5. 商品比對 ────────────────────────────────────────────────────────────
+  let mapping;
+  try {
+    mapping = await mapProductToVendor(orderInfo.goodsName);
+  } catch (err) {
+    console.error('[express] core-mapper 錯誤:', err.message);
+    return res.status(500).json({ success: false, error: '商品比對系統錯誤，請聯繫客服' });
+  }
+  if (!mapping.matched) {
+    console.error(`[express] 商品比對失敗：${orderInfo.goodsName}`);
+    return res.status(400).json({
+      success: false,
+      error:   `無法比對商品「${orderInfo.goodsName}」，請聯繫客服協助處理`,
+    });
+  }
+  console.log(`[express] 比對成功：${mapping.planTitle} → ${mapping.vendor}/${mapping.vendorCode}`);
+
+  // ── 6. 廠商叫貨 ────────────────────────────────────────────────────────────
+  const qty          = orderInfo.qty || 1;
+  // 子訂單號列表（如果 verifyMomoOrder 有回傳），否則以 -item1/-item2 補齊
+  const subOrderNos  = (orderInfo.matchedOrderNos && orderInfo.matchedOrderNos.length)
+    ? orderInfo.matchedOrderNos
+    : Array.from({ length: qty }, (_, i) => qty > 1 ? `${momoOrderNo}-item${i + 1}` : momoOrderNo);
+
+  const dispatched   = [];   // 每筆：{ subOrderNo, qrCode, iccid, vendorOrderId, pending }
+  let   dispatchNote = '';
+
+  console.log(`[express] 開始叫貨，共 ${qty} 件，子訂單列表：${subOrderNos.join(', ')}`);
+
+  for (let i = 0; i < qty; i++) {
+    const subOrderNo = subOrderNos[i];
+    let   entry;
+
+    try {
+      const result = await dispatchOrder({
+        vendor:        mapping.vendor,
+        vendorCode:    mapping.vendorCode,
+        vendorDays:    mapping.vendorDays || 0,
+        customerEmail,
+        orderId:       subOrderNo,
+        productName:   mapping.planTitle || mapping.vendorCode,
+      });
+      entry = {
+        subOrderNo,
+        qrCode:        result.qrCode,
+        iccid:         result.iccid,
+        vendorOrderId: result.vendorOrderId,
+      sourceNumber:  result.sourceNumber || '',
+        pending:       false,
+      };
+      console.log(`[express] ✅ 第 ${i + 1}/${qty} 件叫貨完成 (${subOrderNo})`);
+    } catch (err) {
+      if (err.code === 'DJB_QR_PENDING') {
+        console.warn(`[express] DJB QR Pending (第 ${i + 1} 件): ${err.message}`);
+        entry = {
+          subOrderNo,
+          qrCode:        `DJB_PENDING:${err.djbOrderId}`,
+          iccid:         null,
+          vendorOrderId: String(err.djbOrderId || ''),
+          pending:       true,
+        };
+        dispatchNote = 'eSIM 建立中，QR Code 將於 5-15 分鐘內備妥，請稍候再試';
+      } else {
+        console.error(`[express] 發貨失敗（第 ${i + 1} 件）:`, err.message);
+        return res.status(502).json({
+          success: false,
+          error:   `發貨失敗（第 ${i + 1}/${qty} 件）：${err.message}，請聯繫客服`,
+        });
+      }
+    }
+    dispatched.push(entry);
+  }
+
+  // ── 7. Supabase 存檔（防重複 + 供排程查狀態）────────────────────────────────
+  // 設計：以使用者輸入的 momoOrderNo 當主 key，多件時 qr_code_data 存 JSON 陣列
+  //       同時額外存每個子訂單的 djb_order_id / wm_order_id（JSON 物件陣列）供排程使用
+  const qrCodes     = dispatched.map(d => d.qrCode);
+  const anyPending  = dispatched.some(d => d.pending);
+  const qrCodeStored = qrCodes.length === 1 ? qrCodes[0] : JSON.stringify(qrCodes);
+
+  // 廠商 id 記在對應欄位；multi-item 時存首件，其餘以 JSON 序列化備查
+  const firstEntry  = dispatched[0];
+  const allVendorIds = dispatched.map(d => ({
+    subOrderNo: d.subOrderNo, iccid: d.iccid, vendorOrderId: d.vendorOrderId,
+  }));
+
+  // 先組好含國家的顯示名（給 Supabase + 回傳前端用）
+  const productDisplay = mapping.region
+    ? `${mapping.region},${mapping.planTitle}`
+    : mapping.planTitle;
+
+  const orderRecord = {
+    order_id:           momoOrderNo,
+    platform:           'MOMO',
+    ticket_pin:         momoOrderNo,
+    product_name:       productDisplay,   // 「日本,吃到飽,5天」
+    customer_email:     customerEmail,
+    vendor:             mapping.vendor,
+    vendor_code:        mapping.vendorCode,
+    qr_code_data:       qrCodeStored,
+    iccid:              firstEntry.iccid || null,
+    djb_order_id:       mapping.vendor === 'DJB' ? (firstEntry.vendorOrderId || null) : null,
+    wm_order_id:        mapping.vendor === 'WM'  ? (firstEntry.vendorOrderId || null) : null,
+    telecom_status:     STATUS.DISPATCHED,
+    last_reconciled_at: new Date().toISOString(),
+    status:             anyPending ? 'pending' : 'ready_to_claim',
+    claimed_at:         anyPending ? null : new Date().toISOString(),
+    retry_count:        0,
+    last_error:         qty > 1 ? JSON.stringify(allVendorIds) : null,  // 暫借 last_error 存 multi-item 明細
+    created_at:         new Date().toISOString(),
+  };
+
+  const { error: dbErr } = await supabase
+    .from('orders')
+    .upsert(orderRecord, { onConflict: 'order_id' });
+
+  if (dbErr) {
+    console.error(`[express] ⚠️  Supabase 存檔失敗（QR Code 已正常回傳）: ${dbErr.message}`);
+  } else {
+    console.log(`[express] ✅ Supabase 存檔完成: ${momoOrderNo} (${qty} 件)`);
+  }
+
+  // ── 8. Google Sheets 寫入（每件 QR 各一行）────────────────────────────────
+  //    D 欄（訂單編號）= MOMO 基號（消費者輸入；多件共用）
+  //    E 欄（票券 PIN）= 完整子訂單號（每張網卡唯一；upsert 主鍵）
+  //    用 replaceByTicketPin：如果 reconciler 預先建過「未領取」列，會被完整覆蓋成含 Email + QR；
+  //                        沒有既存列就 append 新列。避免重複列。
+  //    狀態統一寫「已出票」，後續由排程升級為已安裝/已啟用
+  for (const d of dispatched) {
+    const row = buildLogRow({
+      orderTime:     orderInfo.orderDate || new Date().toISOString(),
+      platform:      'MOMO',
+      orderId:       momoOrderNo,                  // D 欄 = 基號
+      ticketPin:     d.subOrderNo,
+      customerPin:   customerPin || '',                 // E 欄 = 完整子訂單（主鍵）
+      customerEmail,                               // F 欄 = 客戶 Email
+      planTitle:     orderInfo.goodsName || mapping.planTitle || '',
+      spec:          mapping.vendorSpec || '',
+      qty:           qty,
+      sellingPrice:  orderInfo.salePrice || '',   // J 欄 = MOMO C1105 SALE_PRICE
+      vendorCode:    mapping.vendorCode || '',
+      vendorName:    mapping.vendorName || '',
+      vendorSpec:    mapping.vendorSpec || '',
+      vendorDays:   mapping.vendorDays || 0,
+      cost:          mapping.vendorCost || 0,
+      qrCodeOrStatus: d.pending ? `建立中（${d.qrCode}）` : (d.qrCode || STATUS.DISPATCHED),
+    });
+    sheetsWriter.replaceByTicketPin({ ticketPin: d.subOrderNo, row }).catch(err => {
+      console.error(`[express] ⚠️ Sheets 替換/寫入失敗 ${d.subOrderNo}: ${err.message}`);
+    });
+  }
+
+  // ── 9. 回傳前端 ────────────────────────────────────────────────────────────
+  // product_name 用 productDisplay（已在第 7 步組好，含國家前綴）
+  const responseItems = dispatched.map(d => ({
+    order_id:     d.subOrderNo,
+    product_name: productDisplay,
+    vendor:       mapping.vendor,
+    qr_code_data: d.qrCode,
+  }));
+
+  console.log(`[express] ===== 兌換完成 ${new Date().toISOString()} (${qty} 件) =====\n`);
+
+  //   —— 8.5. 寄發領取通知信 (fire-and-forget) ——
+dispatched.forEach(function(d, idx){
+  var orderIdSuffix = dispatched.length > 1 ? (' (第 ' + (idx+1) + '/' + dispatched.length + ' 件)') : '';
+  notifyOrder.sendOrderNotification({
+    orderId:         momoOrderNo + orderIdSuffix,
+    customerEmail:   customerEmail,
+    productName:     mapping.region || mapping.planTitle || 'eSIM',
+    planSpec:        mapping.planTitle || '',
+    days:            (mapping.vendorDays || 1) + ' 天',
+    sourceNumber:    d.sourceNumber || '',
+    qrCodeData:      d.qrCode || '',
+    iccid:           d.iccid || '',
+  }).catch(function(){});
+});
+
+  return res.status(200).json({
+    success: true,
+    items:   responseItems,
+    message: dispatchNote || null,
+  });
+});
+
+// ── 啟動伺服器 ────────────────────────────────────────────────────────────────
+const PORT = parseInt(process.env.EXPRESS_PORT || '3001', 10);
+
+function startExpressServer() {
+// -- batch-map: backfill vendor data for old orders
+app.post('/api/admin/batch-map', async (req, res) => {
+  const { internalKey, names } = req.body || {};
+  // auth omitted - internal admin endpoint
+  if (!Array.isArray(names) || !names.length) return res.status(400).json({ success:false, error:'names required' });
+  try {
+    const results = {};
+    for (const name of names) {
+      const m = await mapProductToVendor(name);
+      results[name] = m ? { vendorCode:m.vendorCode||'', vendorName:m.vendorName||'', vendorSpec:m.vendorSpec||'', vendorDays:m.vendorDays||0, vendorCost:m.vendorCost||0 } : null;
+    }
+    return res.json({ success:true, results });
+  } catch(e) { return res.status(500).json({ success:false, error:e.message }); }
+});
+
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[express] ✅ GCP 內部 API 伺服器啟動 → http://0.0.0.0:${PORT}`);
+    console.log(`[express]    POST /api/internal/redeem        — 電子票券核銷`);
+    console.log(`[express]    POST /api/internal/reconcile     — 手動觸發對帳（需 internalKey）`);
+    console.log(`[express]    POST /api/internal/force-refund  — 強制標記某基號為已退貨（需 internalKey）`);
+    console.log(`[express]    GET  /health                     — 健康檢查`);
+  });
+
+  // 同步啟動每 30 分對帳排程
+  startReconcilerCron();
+}
+
+module.exports = { startExpressServer };
