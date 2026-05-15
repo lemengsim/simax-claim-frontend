@@ -784,9 +784,7 @@ export default function ClaimPage() {
                 <ResultPending item={activeItem} onBack={backHandler} />
               )}
 
-              <div className="divider" style={{ marginTop: 28 }} />
-
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ marginTop: 28, display: 'flex', gap: 8 }}>
                 {backHandler && (
                   <button
                     className="btn-submit"
