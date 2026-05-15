@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.14 — QR Code 改 Canvas，支援長按儲存）
+ * 模組：SIMAX eSIM 領取中心前台（v2.15 — 訂單編號複製 + 售後客服連結）
  *
+ * # v2.15.0 | 2026-05-15 | 訂單編號一鍵複製；Footer 加售後客服連結
  * # v2.14.0 | 2026-05-15 | QRCodeSVG → QRCodeCanvas，手機長按可儲存圖片
  * # v2.13.0 | 2026-05-15 | Step 3 底部按鈕並排（領取其他票券 / 回首頁）；重新兌換改回首頁
  * # v2.12.0 | 2026-05-15 | Step 2 文案改「共N件eSIM」（去空格）；重新兌換按鈕 marginTop 32
@@ -100,17 +101,24 @@ function ResultDjb({ item, onBack }) {
   const qr    = item.qr_code_data || '';
   const isLpa = qr.startsWith('LPA:');
   const isUrl = qr.startsWith('http');
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]         = useState(false);
+  const [copiedId, setCopiedId]     = useState(false);
 
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(qr);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, [qr]);
+
+  const handleCopyId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(item.order_id || '');
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch { /* ignore */ }
+  }, [item.order_id]);
 
   return (
     <div className="result-card">
@@ -169,9 +177,12 @@ function ResultDjb({ item, onBack }) {
         </div>
         {/* 訂單編號 */}
         {item.order_id && (
-          <div style={{ padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>訂單編號</div>
-            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{item.order_id}</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>訂單編號</div>
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.4 }}>{item.order_id}</div>
+            </div>
+            <button className="btn-copy" onClick={handleCopyId} style={{ marginLeft: 10, flexShrink: 0, marginTop: 2 }}>{copiedId ? '✓' : '複製'}</button>
           </div>
         )}
         {/* ICCID */}
@@ -677,7 +688,12 @@ export default function ClaimPage() {
 
         {/* ── Footer ── */}
         <div className="footer">
-          SIMAX eSIM &nbsp;·&nbsp; 如有問題請聯繫客服<br />
+          SIMAX eSIM &nbsp;·&nbsp;{' '}
+          <a href="https://esim-simax.com/CSNEW" target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>
+            售後客服
+          </a>
+          <br />
           <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
         </div>
       </div>
