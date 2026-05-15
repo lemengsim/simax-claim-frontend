@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.16 — 售後客服彈窗含訂單號複製）
+ * 模組：SIMAX eSIM 領取中心前台（v2.17 — 二次領取免輸入票券）
  *
+ * # v2.17.0 | 2026-05-15 | 二次領取：verify 回傳 existingItems 時跳過 PIN 直接顯示 QR；Step 3 加客服連結
  * # v2.16.0 | 2026-05-15 | 售後客服改彈窗，顯示訂單編號讓顧客先複製再前往客服
  * # v2.15.0 | 2026-05-15 | 訂單編號一鍵複製；Footer 加售後客服連結
  * # v2.14.0 | 2026-05-15 | QRCodeSVG → QRCodeCanvas，手機長按可儲存圖片
@@ -384,7 +385,17 @@ export default function ClaimPage() {
         throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
       }
 
-      // 若此訂單已領取過（localStorage 有記錄），直接跳過 PIN 顯示結果
+      // ① 若 Supabase 已有出貨記錄（任何裝置二次領取），直接跳過 PIN
+      if (data.existingItems && data.existingItems.length > 0) {
+        const ei = data.existingItems;
+        setItems(ei);
+        try { localStorage.setItem(LS_CLAIM_KEY, JSON.stringify({ orderNo: orderNo.trim(), items: ei })); } catch { /* ignore */ }
+        if (ei.length === 1) { setActiveItem(ei[0]); setStep(3); }
+        else { setStep(2); }
+        return;
+      }
+
+      // ② 若此裝置 localStorage 有快取，直接跳過 PIN
       try {
         const cached = JSON.parse(localStorage.getItem(LS_CLAIM_KEY) || 'null');
         const cachedItems = cached?.items || (Array.isArray(cached) ? cached : null);
@@ -396,7 +407,7 @@ export default function ClaimPage() {
         }
       } catch { /* ignore */ }
 
-      // 依 qty 建立對應數量的空輸入框
+      // ③ 首次領取 → 進入 PIN 輸入
       const qty = data.qty || 1;
       setVerifiedQty(qty);
       setTicketPins(Array(qty).fill(''));
@@ -682,6 +693,15 @@ export default function ClaimPage() {
                   onClick={handleReset}
                 >
                   回首頁
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button
+                  onClick={() => { setShowCsModal(true); setCsCopied(false); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  需要協助？聯繫售後客服
                 </button>
               </div>
             </>
