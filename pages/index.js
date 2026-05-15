@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.24 — Step 3 加「重發信件」按鈕）
+ * 模組：SIMAX eSIM 領取中心前台（v2.25 — 方案資訊去背景卡片、排版強化）
  *
+ * # v2.25.0 | 2026-05-15 | 方案區塊去框化：移除背景卡片、字體層次強化、間距重整
  * # v2.24.0 | 2026-05-15 | Step 3 新增「重發確認信件」按鈕，呼叫 /api/resend-notify
  * # v2.23.0 | 2026-05-15 | 啟用碼/訂單編號列：「點擊複製」文字改為小複製 Icon
  * # v2.22.0 | 2026-05-15 | Step 3：移除 QR 白框卡片、方案卡去 border/shadow，整體更清爽
@@ -129,42 +130,31 @@ function ResultDjb({ item, onBack }) {
   return (
     <div className="result-card">
 
-      {/* ── 方案資訊 ── */}
+      {/* ── 方案資訊（去框化，純文字層次）── */}
       {item.product_name && (
-        <div style={{
-          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-          borderRadius: 14,
-          padding: '16px 18px',
-          marginTop: 4,
-          textAlign: 'left',
-        }}>
-          <div style={{ fontSize: 10, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 10, fontWeight: 700 }}>
+        <div style={{ textAlign: 'center', marginTop: 8, marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: '#8E8E93', marginBottom: 8, letterSpacing: '0.2px' }}>
             📡 &nbsp;您的 eSIM 方案
           </div>
           {planParts.length >= 2 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', rowGap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', rowGap: 4 }}>
               {planParts.map((part, i) => (
                 <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: 16,
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                    lineHeight: 1.3,
-                  }}>{part}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#1C1C1E', lineHeight: 1.2 }}>{part}</span>
                   {i < planParts.length - 1 && (
-                    <span style={{ color: 'rgba(99,102,241,0.4)', fontSize: 15, fontWeight: 300, margin: '0 8px' }}>|</span>
+                    <span style={{ color: '#D1D1D6', fontSize: 18, fontWeight: 300, margin: '0 10px' }}>|</span>
                   )}
                 </span>
               ))}
             </div>
           ) : (
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>{item.product_name}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#1C1C1E', lineHeight: 1.3 }}>{item.product_name}</div>
           )}
         </div>
       )}
 
       {/* ── 引導文字（輕量化）── */}
-      <div style={{ marginTop: 22, marginBottom: 6, fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
+      <div style={{ marginTop: 24, marginBottom: 8, fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
         {isLpa ? '點擊下方按鈕，或長按 QR Code 儲存圖片' : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
       </div>
 
