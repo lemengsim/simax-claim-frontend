@@ -775,7 +775,7 @@ export default function ClaimPage() {
                 <ResultPending item={activeItem} onBack={backHandler} />
               )}
 
-              <div className="divider" />
+              <div className="divider" style={{ marginTop: 28 }} />
 
               <div style={{ display: 'flex', gap: 8 }}>
                 {backHandler && (
