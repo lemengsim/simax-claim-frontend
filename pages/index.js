@@ -812,7 +812,7 @@ export default function ClaimPage() {
                   disabled={resendLoading || resendDone}
                   style={{
                     background: resendDone ? 'rgba(99,102,241,0.08)' : 'var(--surface)',
-                    border: '1px solid var(--border)',
+                    border: 'none',
                     borderRadius: 10,
                     padding: '10px 20px',
                     fontSize: 13,
