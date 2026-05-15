@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.19 — 二次領取多件展開修正）
+ * 模組：SIMAX eSIM 領取中心前台（v2.20 — 所有步驟顯示客服連結；移除 Footer 客服按鈕）
  *
+ * # v2.20.0 | 2026-05-15 | Step 1/2/3 統一顯示「需要協助？聯繫售後客服」；移除 Footer 客服按鈕
  * # v2.19.0 | 2026-05-15 | 二次領取：展開 JSON 陣列格式 qr_code_data，多件正確顯示 Step 2
  * # v2.18.0 | 2026-05-15 | 啟用碼/訂單編號改為點擊整列複製；移除複製按鈕
  * # v2.17.0 | 2026-05-15 | 二次領取：verify 回傳 existingItems 時跳過 PIN 直接顯示 QR；Step 3 加客服連結
@@ -601,6 +602,16 @@ export default function ClaimPage() {
                 }
               </button>
 
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowCsModal(true); setCsCopied(false); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  需要協助？聯繫售後客服
+                </button>
+              </div>
+
             </form>
           )}
 
@@ -657,6 +668,16 @@ export default function ClaimPage() {
                 ← 回上一頁
               </button>
 
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowCsModal(true); setCsCopied(false); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  需要協助？聯繫售後客服
+                </button>
+              </div>
+
             </form>
           )}
 
@@ -685,6 +706,15 @@ export default function ClaimPage() {
                   onClick={handleReset}
                 >
                   回首頁
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button
+                  onClick={() => { setShowCsModal(true); setCsCopied(false); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  需要協助？聯繫售後客服
                 </button>
               </div>
             </div>
@@ -739,14 +769,7 @@ export default function ClaimPage() {
 
         {/* ── Footer ── */}
         <div className="footer">
-          SIMAX eSIM &nbsp;·&nbsp;{' '}
-          <button
-            onClick={() => { setShowCsModal(true); setCsCopied(false); }}
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--brand)', fontWeight: 500, fontSize: 'inherit', cursor: 'pointer' }}
-          >
-            售後客服
-          </button>
-          <br />
+          SIMAX eSIM<br />
           <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
         </div>
 
