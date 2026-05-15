@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.15 — 訂單編號複製 + 售後客服連結）
+ * 模組：SIMAX eSIM 領取中心前台（v2.16 — 售後客服彈窗含訂單號複製）
  *
+ * # v2.16.0 | 2026-05-15 | 售後客服改彈窗，顯示訂單編號讓顧客先複製再前往客服
  * # v2.15.0 | 2026-05-15 | 訂單編號一鍵複製；Footer 加售後客服連結
  * # v2.14.0 | 2026-05-15 | QRCodeSVG → QRCodeCanvas，手機長按可儲存圖片
  * # v2.13.0 | 2026-05-15 | Step 3 底部按鈕並排（領取其他票券 / 回首頁）；重新兌換改回首頁
@@ -333,6 +334,8 @@ export default function ClaimPage() {
   const [activeItem,    setActiveItem]    = useState(null);
   const [claimingId,    setClaimingId]    = useState(null);
   const [specialStatus, setSpecialStatus] = useState(null);
+  const [showCsModal,   setShowCsModal]   = useState(false);
+  const [csCopied,      setCsCopied]      = useState(false);
 
   const canSubmitOrder = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
   const hasDuplicatePin = ticketPins.length > 1 && new Set(ticketPins.map(p => p.trim().toUpperCase()).filter(p => p)).size < ticketPins.filter(p => p.trim()).length;
@@ -689,13 +692,60 @@ export default function ClaimPage() {
         {/* ── Footer ── */}
         <div className="footer">
           SIMAX eSIM &nbsp;·&nbsp;{' '}
-          <a href="https://esim-simax.com/CSNEW" target="_blank" rel="noopener noreferrer"
-            style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>
+          <button
+            onClick={() => { setShowCsModal(true); setCsCopied(false); }}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--brand)', fontWeight: 500, fontSize: 'inherit', cursor: 'pointer' }}
+          >
             售後客服
-          </a>
+          </button>
           <br />
           <span style={{ fontSize: 11 }}>© {new Date().getFullYear()} SIMAX. All rights reserved.</span>
         </div>
+
+        {/* ── 客服彈窗 ── */}
+        {showCsModal && (
+          <div
+            onClick={() => setShowCsModal(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 16, padding: '28px 24px', width: '100%', maxWidth: 360, textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>聯繫售後客服前</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20, lineHeight: 1.6 }}>
+                請先複製您的訂單編號，<br />客服人員可以更快幫您查詢。
+              </div>
+              {orderNo && (
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 14, color: 'var(--text)', wordBreak: 'break-all' }}>{orderNo}</span>
+                  <button
+                    className="btn-copy"
+                    style={{ flexShrink: 0 }}
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(orderNo); setCsCopied(true); setTimeout(() => setCsCopied(false), 2000); } catch {}
+                    }}
+                  >{csCopied ? '✓' : '複製'}</button>
+                </div>
+              )}
+              <a
+                href="https://esim-simax.com/CSNEW"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'block', background: 'var(--brand)', color: '#fff', borderRadius: 10, padding: '13px 0', fontWeight: 600, fontSize: 15, textDecoration: 'none', marginBottom: 10 }}
+                onClick={() => setShowCsModal(false)}
+              >
+                前往客服 →
+              </a>
+              <button
+                onClick={() => setShowCsModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', padding: '4px 0' }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
