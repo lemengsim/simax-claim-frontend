@@ -1,7 +1,8 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.20 — 所有步驟顯示客服連結；移除 Footer 客服按鈕）
+ * 模組：SIMAX eSIM 領取中心前台（v2.21 — Step 3 視覺大改版：數位票卡 + QR 白框卡片）
  *
+ * # v2.21.0 | 2026-05-15 | Step 3：拿掉標題、方案卡改數位票卡風格、QR Code 加白框陰影、間距優化
  * # v2.20.0 | 2026-05-15 | Step 1/2/3 統一顯示「需要協助？聯繫售後客服」；移除 Footer 客服按鈕
  * # v2.19.0 | 2026-05-15 | 二次領取：展開 JSON 陣列格式 qr_code_data，多件正確顯示 Step 2
  * # v2.18.0 | 2026-05-15 | 啟用碼/訂單編號改為點擊整列複製；移除複製按鈕
@@ -106,63 +107,100 @@ function ResultDjb({ item, onBack }) {
   const qr    = item.qr_code_data || '';
   const isLpa = qr.startsWith('LPA:');
   const isUrl = qr.startsWith('http');
-  const [copied, setCopied]         = useState(false);
-  const [copiedId, setCopiedId]     = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(qr);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* ignore */ }
+    try { await navigator.clipboard.writeText(qr); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
   }, [qr]);
 
   const handleCopyId = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(item.order_id || '');
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
-    } catch { /* ignore */ }
+    try { await navigator.clipboard.writeText(item.order_id || ''); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); } catch { /* ignore */ }
   }, [item.order_id]);
+
+  // 嘗試將「日本,吃到飽,1天」格式拆成各部分，用分隔線顯示
+  const planParts = item.product_name
+    ? item.product_name.split(',').map(p => p.trim()).filter(Boolean)
+    : [];
 
   return (
     <div className="result-card">
-      <div className="result-title">eSIM 領取成功！</div>
 
-      {/* 商品資訊 */}
+      {/* ── 數位票卡：方案資訊 ── */}
       {item.product_name && (
-        <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', margin: '12px 0 0', textAlign: 'left' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>您的 eSIM 方案</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{item.product_name}</div>
+        <div style={{
+          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+          borderRadius: 18,
+          padding: '18px 20px',
+          marginTop: 4,
+          textAlign: 'left',
+          boxShadow: '0 2px 16px rgba(99,102,241,0.13)',
+          border: '1px solid rgba(99,102,241,0.15)',
+        }}>
+          <div style={{ fontSize: 10, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: 10, fontWeight: 700 }}>
+            📡 &nbsp;您的 eSIM 方案
+          </div>
+          {planParts.length >= 2 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', rowGap: 4 }}>
+              {planParts.map((part, i) => (
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: i === 0 ? 18 : 15,
+                    fontWeight: i === 0 ? 700 : 500,
+                    color: 'var(--text)',
+                    lineHeight: 1.3,
+                  }}>{part}</span>
+                  {i < planParts.length - 1 && (
+                    <span style={{ color: 'rgba(99,102,241,0.4)', fontSize: 15, fontWeight: 300, margin: '0 8px' }}>|</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>{item.product_name}</div>
+          )}
         </div>
       )}
 
-      <div className="result-sub" style={{ marginTop: 12, marginBottom: 0 }}>
-        {isLpa
-          ? '點擊下方按鈕，或掃描 QR Code 安裝 eSIM'
-          : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
+      {/* ── 引導文字（輕量化）── */}
+      <div style={{ marginTop: 22, marginBottom: 6, fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
+        {isLpa ? '點擊下方按鈕，或長按 QR Code 儲存圖片' : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
       </div>
 
-      {/* QR Code */}
-      <div className="qr-wrap">
-        <QRCodeCanvas value={qr} size={200} level="M" includeMargin={false} style={{ borderRadius: 8 }} />
+      {/* ── QR Code：白色圓角卡片包裝 ── */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: 20,
+        padding: 20,
+        display: 'flex',
+        justifyContent: 'center',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09)',
+        border: '1px solid rgba(0,0,0,0.06)',
+      }}>
+        <QRCodeCanvas
+          value={qr}
+          size={200}
+          level="M"
+          includeMargin={false}
+          style={{ display: 'block', borderRadius: 6 }}
+        />
       </div>
 
-      {/* iOS 一鍵安裝（僅 LPA 格式） */}
+      {/* ── iOS 一鍵安裝（僅 LPA 格式）── */}
       {isLpa && (
         <a
           href={`${IOS_SETUP_BASE}${encodeURIComponent(qr)}`}
           className="btn-ios"
-          style={{ display: 'flex', textDecoration: 'none', marginTop: 16 }}
+          style={{ display: 'flex', textDecoration: 'none', marginTop: 20 }}
         >
           <span style={{ fontSize: 20 }}></span>
           <span>一鍵立即安裝 eSIM</span>
         </a>
       )}
 
-      {/* URL 連結（舊格式） */}
+      {/* ── URL 連結（舊格式）── */}
       {isUrl && !isLpa && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 14 }}>
           <a href={qr} target="_blank" rel="noopener noreferrer"
              style={{ color: 'var(--brand)', fontSize: 13, textDecoration: 'underline', wordBreak: 'break-all' }}>
             {qr}
@@ -170,24 +208,18 @@ function ResultDjb({ item, onBack }) {
         </div>
       )}
 
-      {/* 資訊列：啟用碼 / 訂單編號 / ICCID */}
-      <div style={{ width: '100%', marginTop: 16, borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', textAlign: 'left' }}>
-        {/* 啟用碼 — 點擊整列複製 */}
-        <div
-          onClick={handleCopy}
-          style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: copied ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}
-        >
+      {/* ── 資訊列：啟用碼 / 訂單編號 / ICCID ── */}
+      <div style={{ width: '100%', marginTop: 20, borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden', textAlign: 'left' }}>
+        {/* 啟用碼 */}
+        <div onClick={handleCopy} style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: copied ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}>
           <div style={{ fontSize: 11, color: copied ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
             {copied ? '✓ 已複製' : '啟用碼　點擊複製'}
           </div>
           <div style={{ fontFamily: "'SF Mono', 'Menlo', monospace", fontSize: 13, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.6 }}>{qr}</div>
         </div>
-        {/* 訂單編號 — 點擊整列複製 */}
+        {/* 訂單編號 */}
         {item.order_id && (
-          <div
-            onClick={handleCopyId}
-            style={{ padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none', cursor: 'pointer', background: copiedId ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}
-          >
+          <div onClick={handleCopyId} style={{ padding: '12px 14px', borderBottom: item.iccid ? '1px solid var(--border)' : 'none', cursor: 'pointer', background: copiedId ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.2s' }}>
             <div style={{ fontSize: 11, color: copiedId ? 'var(--brand)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>
               {copiedId ? '✓ 已複製' : '訂單編號　點擊複製'}
             </div>
@@ -203,8 +235,8 @@ function ResultDjb({ item, onBack }) {
         )}
       </div>
 
-      {/* 截圖提醒 */}
-      <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginTop: 16, textAlign: 'left' }}>
+      {/* ── 截圖提醒 ── */}
+      <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: '12px 16px', marginTop: 18, textAlign: 'left' }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 4 }}>【小提醒】</div>
         <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.7 }}>
           若您稍後才要安裝，建議先將此 QR Code 截圖保存。<br />
