@@ -1,7 +1,9 @@
 /**
  * 檔案：pages/index.js
- * 模組：SIMAX eSIM 領取中心前台（v2.12 — Step 2 文案微調 & 按鈕間距）
+ * 模組：SIMAX eSIM 領取中心前台（v2.14 — QR Code 改 Canvas，支援長按儲存）
  *
+ * # v2.14.0 | 2026-05-15 | QRCodeSVG → QRCodeCanvas，手機長按可儲存圖片
+ * # v2.13.0 | 2026-05-15 | Step 3 底部按鈕並排（領取其他票券 / 回首頁）；重新兌換改回首頁
  * # v2.12.0 | 2026-05-15 | Step 2 文案改「共N件eSIM」（去空格）；重新兌換按鈕 marginTop 32
  * # v2.11.0 | 2026-05-15 | 移除 Step 3「eSIM 領取成功！」上方 🎉 emoji
  * # v2.10.0 | 2026-05-15 | Step 2 標題文案改為「共N件eSIM · 可提早領取」；按鈕加大上方間距
@@ -29,7 +31,7 @@
 
 import Head from 'next/head';
 import { useState, useCallback, useEffect } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 // localStorage keys
 const LS_EMAIL_KEY = 'simax_saved_email';
@@ -130,7 +132,7 @@ function ResultDjb({ item, onBack }) {
 
       {/* QR Code */}
       <div className="qr-wrap">
-        <QRCodeSVG value={qr} size={200} level="M" includeMargin={false} />
+        <QRCodeCanvas value={qr} size={200} level="M" includeMargin={false} style={{ borderRadius: 8 }} />
       </div>
 
       {/* iOS 一鍵安裝（僅 LPA 格式） */}
@@ -190,15 +192,6 @@ function ResultDjb({ item, onBack }) {
         </div>
       </div>
 
-      {onBack && (
-        <button
-          className="btn-submit"
-          style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-          onClick={onBack}
-        >
-          領取其他票券
-        </button>
-      )}
     </div>
   );
 }
@@ -223,15 +216,6 @@ function ResultWm({ item, email, onBack }) {
       <p style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
         若超過 30 分鐘未收到，請檢查垃圾郵件或聯繫客服。
       </p>
-      {onBack && (
-        <button
-          className="btn-submit"
-          style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-          onClick={onBack}
-        >
-          領取其他票券
-        </button>
-      )}
     </div>
   );
 }
@@ -290,15 +274,6 @@ function ResultPending({ item, onBack }) {
         正在建立 eSIM，通常需要 5–15 分鐘，<br />請稍候後重新輸入序號查詢。
       </p>
       <p style={{ marginTop: 10, fontSize: 12 }}>如超過 30 分鐘請聯繫客服。</p>
-      {onBack && (
-        <button
-          className="btn-submit"
-          style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-          onClick={onBack}
-        >
-          領取其他票券
-        </button>
-      )}
     </div>
   );
 }
@@ -656,7 +631,7 @@ export default function ClaimPage() {
                   style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
                   onClick={handleReset}
                 >
-                  重新兌換
+                  回首頁
                 </button>
               </div>
             </div>
@@ -677,13 +652,24 @@ export default function ClaimPage() {
 
               <div className="divider" />
 
-              <button
-                className="btn-submit"
-                style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
-                onClick={handleReset}
-              >
-                重新兌換
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {backHandler && (
+                  <button
+                    className="btn-submit"
+                    style={{ flex: 1, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                    onClick={backHandler}
+                  >
+                    領取其他票券
+                  </button>
+                )}
+                <button
+                  className="btn-submit"
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+                  onClick={handleReset}
+                >
+                  回首頁
+                </button>
+              </div>
             </>
           )}
 
