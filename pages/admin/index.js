@@ -1,11 +1,12 @@
 /**
  * 檔案：pages/admin/index.js
  * 模組：SIMAX 後台管理中心
+ * # v1.1.0 | 2026-05-15 | 改版：補寄紀錄改從 Supabase (via VM API) 撈取，支援跨裝置查看
  * # v1.0.0 | 2026-05-15 | 新增：後台管理頁（補寄信件 + Google Sheets 同步記錄）
  */
 
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'simax2026';
 
@@ -18,15 +19,31 @@ export default function AdminPage() {
   const [loading,      setLoading]      = useState(false);
   const [result,       setResult]       = useState(null);
   const [history,      setHistory]      = useState([]);
+  const [histLoading,  setHistLoading]  = useState(false);
+  const [histError,    setHistError]    = useState('');
 
-  // 載入本地補寄紀錄
-  useEffect(() => {
-    if (!authed) return;
+  // 從 API 撈補寄紀錄（跨裝置，存於 Supabase）
+  const fetchHistory = useCallback(async () => {
+    setHistLoading(true);
+    setHistError('');
     try {
-      const saved = JSON.parse(localStorage.getItem('simax_resend_log') || '[]');
-      setHistory(saved);
-    } catch { /* ignore */ }
-  }, [authed]);
+      const res  = await fetch('/api/resend-logs?limit=50');
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.logs)) {
+        setHistory(data.logs);
+      } else {
+        setHistError(data.error || '無法載入紀錄');
+      }
+    } catch (err) {
+      setHistError('網路錯誤，無法載入紀錄');
+    } finally {
+      setHistLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authed) fetchHistory();
+  }, [authed, fetchHistory]);
 
   const handleAuth = (e) => {
     e.preventDefault();
@@ -49,18 +66,11 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const entry = {
-          orderId:   orderId.trim(),
-          email:     email.trim().toLowerCase(),
-          time:      new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
-          status:    'success',
-        };
-        const newHistory = [entry, ...history].slice(0, 20);
-        setHistory(newHistory);
-        try { localStorage.setItem('simax_resend_log', JSON.stringify(newHistory)); } catch { /* ignore */ }
         setResult({ ok: true, message: `✅ 信件已成功補寄至 ${email.trim()}` });
         setOrderId('');
         setEmail('');
+        // 補寄成功後重新載入紀錄
+        setTimeout(fetchHistory, 800);
       } else {
         setResult({ ok: false, message: `❌ ${data.error || '補寄失敗，請確認訂單編號是否正確'}` });
       }
@@ -193,25 +203,42 @@ export default function AdminPage() {
                 </form>
               </div>
 
-              {/* 右：補寄紀錄 */}
+              {/* 右：補寄紀錄（從 Supabase 撈，跨裝置可見） */}
               <div style={{ background: '#fff', borderRadius: 16, padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e8eaed' }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 20, paddingBottom: 14, borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>補寄紀錄</span>
-                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400 }}>僅保留本裝置最近 20 筆</span>
+                  <button
+                    onClick={fetchHistory}
+                    disabled={histLoading}
+                    style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 7, padding: '4px 10px', fontSize: 11, color: '#6b7280', cursor: histLoading ? 'default' : 'pointer' }}
+                  >
+                    {histLoading ? '載入中...' : '🔄 刷新'}
+                  </button>
                 </div>
 
-                {history.length === 0 ? (
+                {histError && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#dc2626', marginBottom: 12 }}>
+                    {histError}
+                  </div>
+                )}
+
+                {histLoading && history.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#d1d5db' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
+                    <div style={{ fontSize: 13 }}>載入中...</div>
+                  </div>
+                ) : history.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#d1d5db' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
                     <div style={{ fontSize: 13 }}>尚無補寄記錄</div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
                     {history.map((h, i) => (
-                      <div key={i} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid #e8eaed' }}>
+                      <div key={h.id || i} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid #e8eaed' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{h.orderId}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{h.order_id}</div>
                             <div style={{ fontSize: 12, color: '#6366f1', marginTop: 2 }}>{h.email}</div>
                           </div>
                           <div style={{ flexShrink: 0 }}>
@@ -220,7 +247,9 @@ export default function AdminPage() {
                             </span>
                           </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>{h.time}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                          {h.resent_at ? new Date(h.resent_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : ''}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -230,7 +259,7 @@ export default function AdminPage() {
 
             {/* 底部提示 */}
             <div style={{ marginTop: 20, padding: '14px 18px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, fontSize: 12, color: '#92400e', lineHeight: 1.7 }}>
-              💡 <strong>Google Sheets 同步：</strong>每次補寄成功後，系統會自動在 Google Sheets 的自助領取紀錄中，於對應訂單列的備註欄寫入「補寄：收件人信箱 | 時間」，方便追蹤。
+              💡 <strong>跨裝置同步：</strong>補寄紀錄保存於 Supabase，任何裝置登入後台都能查看完整歷史。同時會自動同步至 Google Sheets 備註欄，方便對帳。
             </div>
           </div>
         )}
