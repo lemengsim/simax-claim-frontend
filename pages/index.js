@@ -150,6 +150,10 @@ function ResultDjb({ item, onBack }) {
         </div>
       </div>
 
+      {item.iccid && (
+        <div className="result-order-id" style={{ marginTop: 8 }}>ICCID：{item.iccid}</div>
+      )}
+
       {item.order_id && (
         <div className="result-order-id">訂單編號：{item.order_id}</div>
       )}
@@ -336,29 +340,51 @@ export default function ClaimPage() {
   const canSubmit        = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
   const canClaimWithPins = pins.length > 0 && pins.every(p => p.trim().length >= 5 && p.trim().length <= 12) && !loading;
 
-  // ── Step 1a：驗證訂單（取得 qty，不發貨） ───────────────────────────
+  // ── Step 1a：驗證訂單 + 嘗試快取重新領取 ────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/verify', {
+      // 1. 驗證訂單取得 qty
+      const verRes = await fetch('/api/verify', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ orderNo: orderNo.trim(), email: email.trim() }),
       });
+      const verData = await verRes.json();
+      if (!verRes.ok) throw new Error(verData.error || verData.message || `發生錯誤 (${verRes.status})`);
 
-      const data = await res.json();
+      // 2. 嘗試無 PIN 快速領取（已發貨訂單直接回傳 QR，不需輸入 PIN）
+      try {
+        const reRes = await fetch('/api/claim', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ orderNo: orderNo.trim(), email: email.trim(), ticketPins: [] }),
+          signal:  AbortSignal.timeout(30000),
+        });
+        const reData = await reRes.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || data.message || `發生錯誤 (${res.status})`);
+        if (reData.status === 'TICKET_REFUNDED') { setSpecialStatus('TICKET_REFUNDED'); return; }
+        if (reData.status === 'ORDER_RECOVERING') { setSpecialStatus('ORDER_RECOVERING'); return; }
+
+        if (reData.success) {
+          // 快取命中：直接顯示 QR，不需輸入 PIN
+          const normalized = normalizeResponse(reData);
+          setItems(normalized);
+          if (normalized.length === 1) { setActiveItem(normalized[0]); setStep(3); }
+          else { setStep(2); }
+          return;
+        }
+      } catch (_e) {
+        // 快取未命中或逾時，繼續走 PIN 輸入流程
       }
 
-      // 驗證成功：設定件數 + PIN 輸入陣列
-      const q = data.qty || 1;
+      // 3. 尚未發貨：顯示 PIN 輸入框
+      const q = verData.qty || 1;
       setQty(q);
-      setGoodsName(data.goodsName || '');
+      setGoodsName(verData.goodsName || '');
       setPins(Array(q).fill(''));
       setVerified(true);
     } catch (err) {
