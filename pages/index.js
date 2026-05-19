@@ -71,7 +71,7 @@ function ItemCard({ item, onClaim, claiming }) {
         </div>
       </div>
       {isClaimed ? (
-        <button className="btn-claimed" onClick={() => onClaim(item)} title="點擊重新查看 QR Code">已領取 ✓</button>
+        <button className="btn-claimed" onClick={() => onClaim(item)}>重新查看 →</button>
       ) : (
         <button
           className="btn-claim"
