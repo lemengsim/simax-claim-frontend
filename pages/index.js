@@ -2,6 +2,8 @@
  * 檔案：pages/index.js
  * 模組：SIMAX eSIM 領取中心前台（v2.1 — 多件訂單 PIN 輸入支援）
  *
+ * # v2.2.4 | 2026-05-20 | ResultDjb 加「重發確認信」按鈕
+ * # v2.2.3 | 2026-05-20 | 按鈕文字、警示文字、訂單編號灰底框、複製 icon
  * # v2.1.0 | 2026-05-19 | Step 1 拆為驗證 + PIN 輸入兩階段，確保 customerPin 寫入 Sheets
  *
  * 【UX 三步流程】
@@ -86,12 +88,14 @@ function ItemCard({ item, onClaim, claiming }) {
 }
 
 // ─── 結果：DJB QR Code（LPA 或 URL 格式） ─────────────────────────────────
-function ResultDjb({ item, onBack }) {
+function ResultDjb({ item, onBack, email }) {
   const qr    = item.qr_code_data || '';
   const isLpa = qr.startsWith('LPA:');
   const isUrl = qr.startsWith('http');
   const [copied,      setCopied]      = useState(false);
   const [copiedOrder, setCopiedOrder] = useState(false);
+  const [resending,   setResending]   = useState(false);
+  const [resendMsg,   setResendMsg]   = useState(null); // { ok: bool, text: string }
 
   const handleCopy = useCallback(async () => {
     try { await navigator.clipboard.writeText(qr); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
@@ -100,6 +104,30 @@ function ResultDjb({ item, onBack }) {
   const handleCopyOrder = useCallback(async () => {
     try { await navigator.clipboard.writeText(item.order_id || ''); setCopiedOrder(true); setTimeout(() => setCopiedOrder(false), 2000); } catch {}
   }, [item.order_id]);
+
+  const handleResend = useCallback(async () => {
+    if (resending) return;
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await fetch('/api/resend-notify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderId: item.order_id, email }),
+        signal:  AbortSignal.timeout(25000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setResendMsg({ ok: true, text: '✓ 確認信已重新寄出，請檢查您的信箱' });
+      } else {
+        setResendMsg({ ok: false, text: data.error || '寄送失敗，請稍後再試' });
+      }
+    } catch (err) {
+      setResendMsg({ ok: false, text: '網路錯誤，請稍後再試' });
+    } finally {
+      setResending(false);
+    }
+  }, [item.order_id, email, resending]);
 
   return (
     <div className="result-card">
@@ -183,10 +211,38 @@ function ResultDjb({ item, onBack }) {
         </div>
       )}
 
+      {/* 重發確認信 */}
+      <button
+        onClick={handleResend}
+        disabled={resending}
+        style={{
+          marginTop: 16, width: '100%', padding: '10px 0',
+          border: '1px solid #e5e7eb', borderRadius: 10,
+          background: 'white', cursor: resending ? 'not-allowed' : 'pointer',
+          fontSize: 13, color: 'var(--muted)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}
+      >
+        {resending
+          ? <><span className="spinner-dark" /> 寄送中…</>
+          : <>✉️ 重發確認信至信箱</>}
+      </button>
+      {resendMsg && (
+        <div style={{
+          marginTop: 8, padding: '8px 12px', borderRadius: 8, fontSize: 12,
+          background: resendMsg.ok ? '#f0fdf4' : '#fef2f2',
+          color:      resendMsg.ok ? '#15803d' : '#b91c1c',
+          border:     `1px solid ${resendMsg.ok ? '#bbf7d0' : '#fecaca'}`,
+          textAlign: 'center',
+        }}>
+          {resendMsg.text}
+        </div>
+      )}
+
       {onBack && (
         <button
           className="btn-submit"
-          style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
+          style={{ marginTop: 12, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
           onClick={onBack}
         >
           ← 領取其他 eSIM
@@ -684,7 +740,7 @@ export default function ClaimPage() {
           {!specialStatus && step === 3 && activeItem && (
             <>
               {qrType === 'djb' && (
-                <ResultDjb item={activeItem} onBack={backHandler} />
+                <ResultDjb item={activeItem} onBack={backHandler} email={email} />
               )}
               {qrType === 'wm' && (
                 <ResultWm item={activeItem} email={email} onBack={backHandler} />

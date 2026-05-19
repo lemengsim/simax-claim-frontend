@@ -32,9 +32,10 @@
 const express              = require('express');
 const { google }           = require('googleapis');
 const { createClient }     = require('@supabase/supabase-js');
-const { verifyMomoOrder }    = require('./momo-ingest');
-const { mapProductToVendor } = require('./core-mapper');
-const { dispatchOrder }      = require('./dispatch-worker');
+const { verifyMomoOrder }        = require('./momo-ingest');
+const { mapProductToVendor }     = require('./core-mapper');
+const { dispatchOrder }          = require('./dispatch-worker');
+const notifyOrder                = require('./notify-order');
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -451,14 +452,93 @@ app.post('/api/internal/redeem', async (req, res) => {
   });
 });
 
+// ── 重發通知信端點 ────────────────────────────────────────────────────────────
+/**
+ * POST /api/internal/resend-notify
+ * Body: { orderId: string, email: string, internalKey: string }
+ * 從 Supabase 查詢訂單資料後，呼叫 sendOrderNotification 重寄確認信。
+ */
+app.post('/api/internal/resend-notify', async (req, res) => {
+  const { orderId, email, internalKey } = req.body || {};
+
+  // 驗證 internalKey
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && internalKey !== expectedKey) {
+    console.warn('[express] ⚠️  resend-notify internalKey 驗證失敗');
+    return res.status(403).json({ success: false, error: '未授權' });
+  }
+
+  if (!orderId || !email) {
+    return res.status(400).json({ success: false, error: 'orderId 與 email 為必填' });
+  }
+
+  try {
+    // 從 Supabase 查詢訂單資料（支援子訂單號前綴比對）
+    const { data: rows, error: dbErr } = await supabase
+      .from('orders')
+      .select('order_id, status, qr_code_data, product_name, customer_email')
+      .or(`order_id.eq.${orderId},order_id.like.${orderId}%`)
+      .limit(10);
+
+    if (dbErr) {
+      console.error('[express] resend-notify Supabase 查詢失敗:', dbErr.message);
+      return res.status(500).json({ success: false, error: '查詢訂單失敗' });
+    }
+
+    // 篩選有 QR Code 的有效訂單（排除 PENDING/RECOVERING）
+    const validRows = (rows || []).filter(r =>
+      r.qr_code_data && !r.qr_code_data.startsWith('DJB_PENDING:')
+    );
+
+    if (validRows.length === 0) {
+      return res.status(404).json({ success: false, error: '找不到有效訂單或 eSIM 尚未準備完成' });
+    }
+
+    // 驗證 email 一致性（至少有一筆 email 相符，或舊資料無 email）
+    const emailMatch = validRows.some(r => !r.customer_email || r.customer_email === email);
+    if (!emailMatch) {
+      console.warn('[express] resend-notify Email 不符：' + email + ' vs ' + validRows[0].customer_email);
+      return res.status(403).json({ success: false, error: '此 Email 與原始訂單不符' });
+    }
+
+    // 逐件重發（多件訂單每件都寄）
+    let sentCount = 0;
+    for (const row of validRows) {
+      const result = await notifyOrder.sendOrderNotification({
+        orderId:       row.order_id,
+        customerEmail: email,
+        qrCodeData:    row.qr_code_data,
+        productName:   row.product_name || 'eSIM',
+      });
+      if (result.ok) {
+        sentCount++;
+        console.log('[express] resend-notify ✅ 已重寄 ' + row.order_id + ' → ' + email);
+      } else {
+        console.warn('[express] resend-notify ⚠️ 寄送失敗 ' + row.order_id + ': ' + result.error);
+      }
+    }
+
+    if (sentCount === 0) {
+      return res.status(500).json({ success: false, error: '寄送失敗，請稍後再試' });
+    }
+
+    return res.status(200).json({ success: true, sent: sentCount });
+
+  } catch (err) {
+    console.error('[express] resend-notify 例外:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── 啟動伺服器 ────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.EXPRESS_PORT || '3001', 10);
 
 function startExpressServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[express] ✅ GCP 內部 API 伺服器啟動 → http://0.0.0.0:${PORT}`);
-    console.log(`[express]    POST /api/internal/redeem  — 電子票券核銷端點`);
-    console.log(`[express]    GET  /health               — 健康檢查`);
+    console.log(`[express]    POST /api/internal/redeem        — 電子票券核銷端點`);
+    console.log(`[express]    POST /api/internal/resend-notify — 重發通知信`);
+    console.log(`[express]    GET  /health                     — 健康檢查`);
   });
 }
 
