@@ -338,7 +338,8 @@ export default function ClaimPage() {
   const [specialStatus, setSpecialStatus] = useState(null);
 
   const canSubmit        = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
-  const canClaimWithPins = pins.length > 0 && pins.every(p => p.trim().length >= 5 && p.trim().length <= 12) && !loading;
+  const allPinsSame      = pins.length > 1 && pins.every(p => p.trim().length > 0 && p.trim() === pins[0].trim());
+  const canClaimWithPins = pins.length > 0 && pins.every(p => p.trim().length >= 5 && p.trim().length <= 12) && !allPinsSame && !loading;
 
   // ── Step 1a：驗證訂單 + 嘗試快取重新領取 ────────────────────────────
   const handleLogin = async (e) => {
@@ -588,6 +589,13 @@ export default function ClaimPage() {
                   )}
                 </div>
               ))}
+
+              {allPinsSame && (
+                <div className="error-box">
+                  <span>⚠️</span>
+                  <span>每張票券序號不可完全相同，請確認後重新輸入</span>
+                </div>
+              )}
 
               {error && (
                 <div className="error-box">
