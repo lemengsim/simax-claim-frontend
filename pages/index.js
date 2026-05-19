@@ -138,6 +138,12 @@ function ResultDjb({ item, onBack }) {
         </div>
       )}
 
+      {/* 提醒截圖保存 */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '10px 12px', marginTop: 16, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+        <span style={{ flexShrink: 0 }}>⚠️</span>
+        <span>若您稍後才要安裝，建議先將此 QR Code 截圖保存。日後需要使用時，直接掃描圖片即可輕鬆安裝。</span>
+      </div>
+
       {/* 啟用碼原文 + 點擊複製 */}
       <div className="qr-raw-box" onClick={handleCopy} style={{ cursor: 'pointer' }} title="點擊複製啟用碼">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
