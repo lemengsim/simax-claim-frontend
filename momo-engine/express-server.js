@@ -474,10 +474,12 @@ app.post('/api/internal/resend-notify', async (req, res) => {
 
   try {
     // 從 Supabase 查詢訂單資料（支援子訂單號前綴比對）
+    // 主訂單號（純數字部分），支援 -item1 / -001-001-001 等各種後綴格式
+    const baseOrderId = (orderId.match(/^\d+/) || [orderId])[0];
     const { data: rows, error: dbErr } = await supabase
       .from('orders')
       .select('order_id, status, qr_code_data, product_name, customer_email')
-      .or(`order_id.eq.${orderId},order_id.like.${orderId}%`)
+      .or(`order_id.eq.${orderId},order_id.like.${baseOrderId}%`)
       .limit(10);
 
     if (dbErr) {
