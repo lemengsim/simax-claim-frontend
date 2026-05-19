@@ -160,15 +160,20 @@ function ResultDjb({ item, onBack }) {
       )}
 
       {item.order_id && (
-        <div className="result-order-id" onClick={handleCopyOrder} style={{ cursor: 'pointer' }} title="點擊複製訂單編號">
-          <span>訂單編號：{item.order_id}</span>
-          <span style={{ marginLeft: 6, color: copiedOrder ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
-            {copiedOrder ? '✓' : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            )}
-          </span>
+        <div className="qr-raw-box" onClick={handleCopyOrder} style={{ cursor: 'pointer', marginTop: 8 }} title="點擊複製訂單編號">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>訂單編號</span>
+            <span style={{ color: copiedOrder ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+              {copiedOrder ? '✓' : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              )}
+            </span>
+          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>
+            {item.order_id}
+          </div>
         </div>
       )}
 
