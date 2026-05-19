@@ -90,17 +90,16 @@ function ResultDjb({ item, onBack }) {
   const qr    = item.qr_code_data || '';
   const isLpa = qr.startsWith('LPA:');
   const isUrl = qr.startsWith('http');
-  const [copied, setCopied] = useState(false);
+  const [copied,      setCopied]      = useState(false);
+  const [copiedOrder, setCopiedOrder] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(qr);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
-    }
+    try { await navigator.clipboard.writeText(qr); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   }, [qr]);
+
+  const handleCopyOrder = useCallback(async () => {
+    try { await navigator.clipboard.writeText(item.order_id || ''); setCopiedOrder(true); setTimeout(() => setCopiedOrder(false), 2000); } catch {}
+  }, [item.order_id]);
 
   return (
     <div className="result-card">
@@ -139,11 +138,17 @@ function ResultDjb({ item, onBack }) {
         </div>
       )}
 
-      {/* 啟用碼原文 + 複製 */}
-      <div className="qr-raw-box">
+      {/* 啟用碼原文 + 點擊複製 */}
+      <div className="qr-raw-box" onClick={handleCopy} style={{ cursor: 'pointer' }} title="點擊複製啟用碼">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>啟用碼</span>
-          <button className="btn-copy" onClick={handleCopy}>{copied ? '已複製 ✓' : '複製'}</button>
+          <span style={{ color: copied ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+            {copied ? '✓' : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            )}
+          </span>
         </div>
         <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>
           {qr}
@@ -155,7 +160,16 @@ function ResultDjb({ item, onBack }) {
       )}
 
       {item.order_id && (
-        <div className="result-order-id">訂單編號：{item.order_id}</div>
+        <div className="result-order-id" onClick={handleCopyOrder} style={{ cursor: 'pointer' }} title="點擊複製訂單編號">
+          <span>訂單編號：{item.order_id}</span>
+          <span style={{ marginLeft: 6, color: copiedOrder ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+            {copiedOrder ? '✓' : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            )}
+          </span>
+        </div>
       )}
 
       {onBack && (
