@@ -183,7 +183,7 @@ function ResultDjb({ item, onBack }) {
           style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
           onClick={onBack}
         >
-          ← 返回商品列表
+          ← 領取其他 eSIM
         </button>
       )}
     </div>
@@ -210,7 +210,7 @@ function ResultWm({ item, email, onBack }) {
           style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
           onClick={onBack}
         >
-          ← 返回商品列表
+          ← 領取其他 eSIM
         </button>
       )}
     </div>
@@ -302,7 +302,7 @@ function ResultPending({ item, onBack }) {
           style={{ marginTop: 16, background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
           onClick={onBack}
         >
-          ← 返回商品列表
+          ← 領取其他 eSIM
         </button>
       )}
     </div>
@@ -669,7 +669,7 @@ export default function ClaimPage() {
                 style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
                 onClick={handleReset}
               >
-                ← 查詢其他票券
+                ← 回首頁
               </button>
             </div>
           )}
@@ -694,7 +694,7 @@ export default function ClaimPage() {
                 style={{ background: 'rgba(0,0,0,0.04)', boxShadow: 'none', color: 'var(--muted)', fontSize: 13 }}
                 onClick={handleReset}
               >
-                ← 查詢其他票券
+                ← 回首頁
               </button>
             </>
           )}
