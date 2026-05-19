@@ -334,7 +334,7 @@ export default function ClaimPage() {
   const [specialStatus, setSpecialStatus] = useState(null);
 
   const canSubmit        = orderNo.trim().length > 0 && email.trim().length > 5 && !loading;
-  const canClaimWithPins = pins.length > 0 && pins.every(p => p.trim().length === 12) && !loading;
+  const canClaimWithPins = pins.length > 0 && pins.every(p => p.trim().length >= 5 && p.trim().length <= 12) && !loading;
 
   // ── Step 1a：驗證訂單（取得 qty，不發貨） ───────────────────────────
   const handleLogin = async (e) => {
@@ -544,7 +544,7 @@ export default function ClaimPage() {
 
               {pins.map((pin, i) => (
                 <div className="field" key={i}>
-                  <label>第 {i + 1} 張 電子票務序號（12 碼）</label>
+                  <label>第 {i + 1} 張 電子票務序號（5-12 碼）</label>
                   <input
                     type="text"
                     placeholder="例：A1B2C3D4E5F6"
@@ -560,8 +560,8 @@ export default function ClaimPage() {
                       setError('');
                     }}
                   />
-                  {pin.length > 0 && pin.length !== 12 && (
-                    <span className="hint" style={{ color: '#ef4444' }}>需輸入 12 碼（目前 {pin.length} 碼）</span>
+                  {pin.length > 0 && (pin.length < 5 || pin.length > 12) && (
+                    <span className="hint" style={{ color: '#ef4444' }}>需輸入 5-12 碼（目前 {pin.length} 碼）</span>
                   )}
                 </div>
               ))}
