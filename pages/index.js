@@ -494,7 +494,7 @@ export default function ClaimPage() {
                 <label>MOMO 訂單編號</label>
                 <input
                   type="text"
-                  placeholder="例：26042217105803-001-001-001"
+                  placeholder=""
                   value={orderNo}
                   onChange={(e) => { setOrderNo(e.target.value.trim()); setError(''); }}
                   autoFocus
@@ -507,7 +507,7 @@ export default function ClaimPage() {
                 <label>信箱</label>
                 <input
                   type="email"
-                  placeholder="例：user@example.com"
+                  placeholder=""
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
