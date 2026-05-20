@@ -137,11 +137,9 @@ function ResultDjb({ item, onBack, email }) {
 
   return (
     <div className="result-card">
-      <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
-      <div className="result-title">eSIM 領取成功！</div>
-      <div className="result-sub">
+      <div className="result-sub" style={{ marginBottom: 4 }}>
         {isLpa
-          ? '點擊下方按鈕，或掃描 QR Code 在 iPhone 上安裝 eSIM'
+          ? '點擊下方按鈕，或掃描 QR Code 即可安裝 eSIM'
           : '請掃描以下 QR Code 或點擊連結啟用您的 eSIM'}
       </div>
 
