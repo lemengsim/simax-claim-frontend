@@ -2,6 +2,7 @@
  * 檔案：pages/index.js
  * 模組：SIMAX eSIM 領取中心前台（v2.1 — 多件訂單 PIN 輸入支援）
  *
+ * # v2.2.5 | 2026-05-20 | ResultDjb 資訊區塊合併成單一大框
  * # v2.2.4 | 2026-05-20 | ResultDjb 加「重發確認信」按鈕
  * # v2.2.3 | 2026-05-20 | 按鈕文字、警示文字、訂單編號灰底框、複製 icon
  * # v2.1.0 | 2026-05-19 | Step 1 拆為驗證 + PIN 輸入兩階段，確保 customerPin 寫入 Sheets
@@ -93,6 +94,7 @@ function ResultDjb({ item, onBack, email }) {
   const isLpa = qr.startsWith('LPA:');
   const isUrl = qr.startsWith('http');
   const [copied,      setCopied]      = useState(false);
+  const [copiedIccid, setCopiedIccid] = useState(false);
   const [copiedOrder, setCopiedOrder] = useState(false);
   const [resending,   setResending]   = useState(false);
   const [resendMsg,   setResendMsg]   = useState(null); // { ok: bool, text: string }
@@ -100,6 +102,10 @@ function ResultDjb({ item, onBack, email }) {
   const handleCopy = useCallback(async () => {
     try { await navigator.clipboard.writeText(qr); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   }, [qr]);
+
+  const handleCopyIccid = useCallback(async () => {
+    try { await navigator.clipboard.writeText(item.iccid || ''); setCopiedIccid(true); setTimeout(() => setCopiedIccid(false), 2000); } catch {}
+  }, [item.iccid]);
 
   const handleCopyOrder = useCallback(async () => {
     try { await navigator.clipboard.writeText(item.order_id || ''); setCopiedOrder(true); setTimeout(() => setCopiedOrder(false), 2000); } catch {}
@@ -172,44 +178,59 @@ function ResultDjb({ item, onBack, email }) {
         <span>若您稍後才要安裝，建議先將此 QR Code 截圖保存。日後需要使用時，直接掃描圖片即可輕鬆安裝。</span>
       </div>
 
-      {/* 啟用碼原文 + 點擊複製 */}
-      <div className="qr-raw-box" onClick={handleCopy} style={{ cursor: 'pointer' }} title="點擊複製啟用碼">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>啟用碼</span>
-          <span style={{ color: copied ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
-            {copied ? '✓' : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            )}
-          </span>
-        </div>
-        <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>
-          {qr}
-        </div>
-      </div>
+      {/* 合併資訊大框：啟用碼 / ICCID / 訂單編號 */}
+      <div style={{ marginTop: 16, background: 'var(--surface,#f8f9fa)', border: '1px solid var(--border,#e5e7eb)', borderRadius: 12, overflow: 'hidden' }}>
 
-      {item.iccid && (
-        <div className="result-order-id" style={{ marginTop: 8 }}>ICCID：{item.iccid}</div>
-      )}
-
-      {item.order_id && (
-        <div className="qr-raw-box" onClick={handleCopyOrder} style={{ cursor: 'pointer', marginTop: 8 }} title="點擊複製訂單編號">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>訂單編號</span>
-            <span style={{ color: copiedOrder ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
-              {copiedOrder ? '✓' : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* 啟用碼 */}
+        <div onClick={handleCopy} style={{ padding: '12px 14px', cursor: 'pointer', borderBottom: item.iccid || item.order_id ? '1px solid var(--border,#e5e7eb)' : 'none' }} title="點擊複製啟用碼">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>啟用碼</span>
+            <span style={{ color: copied ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+              {copied ? '✓' : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
               )}
             </span>
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>
-            {item.order_id}
-          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>{qr}</div>
         </div>
-      )}
+
+        {/* ICCID */}
+        {item.iccid && (
+          <div onClick={handleCopyIccid} style={{ padding: '12px 14px', cursor: 'pointer', borderBottom: item.order_id ? '1px solid var(--border,#e5e7eb)' : 'none' }} title="點擊複製 ICCID">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ICCID</span>
+              <span style={{ color: copiedIccid ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+                {copiedIccid ? '✓' : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                )}
+              </span>
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>{item.iccid}</div>
+          </div>
+        )}
+
+        {/* 訂單編號 */}
+        {item.order_id && (
+          <div onClick={handleCopyOrder} style={{ padding: '12px 14px', cursor: 'pointer' }} title="點擊複製訂單編號">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>訂單編號</span>
+              <span style={{ color: copiedOrder ? '#22c55e' : 'var(--muted)', fontSize: 14, transition: 'color 0.2s' }}>
+                {copiedOrder ? '✓' : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                )}
+              </span>
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', color: 'var(--text)', lineHeight: 1.5 }}>{item.order_id}</div>
+          </div>
+        )}
+
+      </div>
 
       {/* 重發確認信 */}
       <button
