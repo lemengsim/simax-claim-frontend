@@ -150,9 +150,22 @@ function extractDjbQrCode(result) {
 }
 
 /**
+ * 從 DJB 查詢 API 多層路徑中安全取出 iccid
+ */
+function extractDjbIccid(result) {
+  return (
+    result?.data?.iccid                    ||
+    result?.data?.data?.iccid             ||
+    result?.data?.cards?.[0]?.iccid       ||
+    result?.iccid                          ||
+    null
+  );
+}
+
+/**
  * 向 DJB 下單並輪詢取得 QR Code
  * @param {{ vendorCode: string, vendorDays: number, orderId: string }} params
- * @returns {Promise<string>} LPA QR Code 內容
+ * @returns {Promise<{ qrCode: string, iccid: string|null, vendorOrderId: string|null, sourceNumber: string }>}
  */
 async function dispatchDjb({ vendorCode, vendorDays, orderId }) {
   const baseUrl  = process.env.DJB_BASE_URL;
@@ -218,10 +231,11 @@ async function dispatchDjb({ vendorCode, vendorDays, orderId }) {
     });
 
     const qrCode = extractDjbQrCode(queryResult);
+    const iccid  = extractDjbIccid(queryResult);
 
     if (qrCode) {
-      console.log(`[dispatch-djb] ✅ QR Code 取得成功 (第 ${attempt} 次查詢)`);
-      return qrCode;
+      console.log(`[dispatch-djb] ✅ QR Code 取得成功 (第 ${attempt} 次查詢) iccid=${iccid || 'N/A'}`);
+      return { qrCode, iccid, vendorOrderId: String(djbOrderId || ''), sourceNumber: sourceNo };
     }
 
     console.log(`[dispatch-djb] QR 尚未就緒，第 ${attempt}/5 次查詢...`);
@@ -301,7 +315,7 @@ async function dispatchWm({ vendorCode, customerEmail, orderId }) {
 
   // 回傳 WM 訂單號作為 qr_code_data 佔位
   // 前台收到此格式時顯示「兌換碼已由世界移動寄送至您的 Email」
-  return `WM_ORDER:${wmOrderId}`;
+  return { qrCode: `WM_ORDER:${wmOrderId}`, iccid: null, vendorOrderId: String(wmOrderId), sourceNumber: '' };
 }
 
 // ── 主發貨介面（統一入口）────────────────────────────────────────────────────
@@ -315,7 +329,7 @@ async function dispatchWm({ vendorCode, customerEmail, orderId }) {
  *   customerEmail: string,   // 客戶 Email（WM 必填；DJB 非必填）
  *   orderId:       string,   // MOMO 訂單編號或內部 ID（作為備注）
  * }} params
- * @returns {Promise<string>} QR Code 內容 (DJB) 或 WM_ORDER:<orderId> (WM)
+ * @returns {Promise<{ qrCode: string, iccid: string|null, vendorOrderId: string|null, sourceNumber: string }>}
  */
 async function dispatchOrder({ vendor, vendorCode, vendorDays, customerEmail, orderId }) {
   if (!vendor || !vendorCode) {
